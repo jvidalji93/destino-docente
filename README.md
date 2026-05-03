@@ -39,7 +39,7 @@ El proyecto usa PostgreSQL con PostGIS para desarrollo local.
    docker compose --env-file .env -f infra/docker-compose.yml ps
    ```
 
-La base de datos queda disponible en `localhost:5432` por defecto.
+La base de datos queda disponible en `localhost:5433` por defecto. Dentro del contenedor PostgreSQL sigue escuchando en el puerto `5432`.
 
 ### Parar la base de datos
 
@@ -54,3 +54,47 @@ docker compose --env-file .env -f infra/docker-compose.yml down -v
 ```
 
 No subas el archivo `.env` al repositorio. Usa `.env.example` como referencia de las variables necesarias.
+
+## Backend local
+
+El backend usa FastAPI y lee la configuracion de base de datos desde las variables definidas en `.env`.
+
+### Requisitos
+
+- Python 3.11 o superior
+- Base de datos local levantada con Docker Compose
+
+### Instalar dependencias
+
+Desde la raiz del repositorio:
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+En macOS o Linux:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Arrancar el backend
+
+Con la base de datos local en marcha, ejecuta desde `backend`:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+La API queda disponible por defecto en `http://127.0.0.1:8000`.
+
+Endpoints iniciales:
+
+- `GET /health` comprueba que la API responde.
+- `GET /db/health` comprueba que la API puede conectar con PostgreSQL.
