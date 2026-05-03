@@ -138,6 +138,30 @@ http://127.0.0.1:5173
 
 Deberias ver centros educativos como puntos en el mapa y tambien en la tabla. La tabla permite ordenar resultados y descargar el CSV de los resultados visibles.
 
+## Importar Datos Desde CSV
+
+Todavia no hay una fuente abierta concreta implementada. Las fuentes candidatas y el formato base se documentan en `docs/data-sources.md`.
+
+El importador base lee un CSV local con estas columnas:
+
+```csv
+name,address,municipality,province,autonomous_region,ownership,education_levels,latitude,longitude
+```
+
+Desde `backend`, con el entorno virtual activado:
+
+```powershell
+$env:PYTHONPATH = "."
+python -m scripts.import_schools_csv ..\data\schools.csv
+```
+
+Los registros sin `latitude` o `longitude` se saltan y muestran un aviso. El importador no borra datos existentes; si quieres reemplazar todo el contenido de `schools`, usa la opcion explicita `--truncate`:
+
+```powershell
+$env:PYTHONPATH = "."
+python -m scripts.import_schools_csv ..\data\schools.csv --truncate
+```
+
 ## Comandos Utiles
 
 Parar la base de datos:

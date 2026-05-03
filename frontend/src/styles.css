@@ -46,9 +46,15 @@ input {
   color: #5f6c7b;
 }
 
+.toolbar .help-text {
+  max-width: 520px;
+  color: #334155;
+  font-size: 14px;
+}
+
 .search-form {
   display: grid;
-  grid-template-columns: repeat(3, minmax(120px, 160px)) minmax(180px, auto);
+  grid-template-columns: minmax(120px, 160px) minmax(260px, auto);
   gap: 12px;
   align-items: end;
 }
@@ -109,6 +115,24 @@ input {
   background: #edf1f6;
 }
 
+.advanced-controls {
+  grid-column: 1 / -1;
+  color: #526071;
+  font-size: 13px;
+}
+
+.advanced-controls summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.coordinate-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 160px));
+  gap: 12px;
+  margin-top: 10px;
+}
+
 .workspace {
   flex: 1;
   display: grid;
@@ -125,6 +149,7 @@ input {
   width: 100%;
   height: 100%;
   min-height: 520px;
+  cursor: crosshair;
 }
 
 .results-panel {
@@ -288,6 +313,10 @@ th {
   .search-form {
     grid-template-columns: 1fr;
     margin-top: 18px;
+  }
+
+  .coordinate-fields {
+    grid-template-columns: 1fr;
   }
 
   .form-actions {

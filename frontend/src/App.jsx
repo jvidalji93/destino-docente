@@ -56,6 +56,7 @@ function App() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
+  const formRef = useRef(DEFAULT_SEARCH);
   const [form, setForm] = useState(DEFAULT_SEARCH);
   const [schools, setSchools] = useState([]);
   const [status, setStatus] = useState("Introduce una ubicacion y busca centros cercanos.");
@@ -85,6 +86,10 @@ function App() {
   }, [myList, selectedVisibleSchools]);
 
   useEffect(() => {
+    formRef.current = form;
+  }, [form]);
+
+  useEffect(() => {
     if (!mapElementRef.current || mapRef.current) {
       return;
     }
@@ -101,6 +106,16 @@ function App() {
     }).addTo(map);
 
     layerRef.current = L.layerGroup().addTo(map);
+    map.on("click", (event) => {
+      const nextForm = {
+        ...formRef.current,
+        lat: event.latlng.lat.toFixed(6),
+        lng: event.latlng.lng.toFixed(6),
+      };
+
+      setForm(nextForm);
+      runSearch(nextForm);
+    });
     mapRef.current = map;
   }, [center]);
 
@@ -123,6 +138,16 @@ function App() {
       weight: 2,
     }).addTo(layer);
 
+    L.circleMarker(center, {
+      radius: 10,
+      color: "#7f1d1d",
+      fillColor: "#ef4444",
+      fillOpacity: 0.95,
+      weight: 3,
+    })
+      .bindPopup("Punto de busqueda")
+      .addTo(layer);
+
     sortedSchools.forEach((school) => {
       L.circleMarker([school.latitude, school.longitude], {
         radius: 8,
@@ -140,7 +165,11 @@ function App() {
 
   function updateForm(event) {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => {
+      const nextForm = { ...current, [name]: value };
+      formRef.current = nextForm;
+      return nextForm;
+    });
   }
 
   async function runSearch(searchValues) {
@@ -314,17 +343,12 @@ function App() {
         <div>
           <h1>Destino Docente</h1>
           <p>Centros educativos cercanos</p>
+          <p className="help-text">
+            Haz clic en el mapa o usa tu ubicacion actual para elegir el punto de busqueda.
+          </p>
         </div>
 
         <form className="search-form" onSubmit={searchSchools}>
-          <label>
-            Latitud
-            <input name="lat" type="number" step="any" value={form.lat} onChange={updateForm} required />
-          </label>
-          <label>
-            Longitud
-            <input name="lng" type="number" step="any" value={form.lng} onChange={updateForm} required />
-          </label>
           <label>
             Radio km
             <input
@@ -351,6 +375,19 @@ function App() {
               {isLocating ? "Ubicando" : "Usar mi ubicación"}
             </button>
           </div>
+          <details className="advanced-controls">
+            <summary>Coordenadas avanzadas</summary>
+            <div className="coordinate-fields">
+              <label>
+                Latitud
+                <input name="lat" type="number" step="any" value={form.lat} onChange={updateForm} required />
+              </label>
+              <label>
+                Longitud
+                <input name="lng" type="number" step="any" value={form.lng} onChange={updateForm} required />
+              </label>
+            </div>
+          </details>
         </form>
       </section>
 
