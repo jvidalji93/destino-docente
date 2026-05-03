@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 
-from app.db import check_database_connection
+from app.db import check_postgis_connection
 
 
 app = FastAPI(title="Destino Docente API")
@@ -14,14 +14,11 @@ def health() -> dict[str, str]:
 @app.get("/db/health")
 def database_health() -> dict[str, str]:
     try:
-        is_connected = check_database_connection()
+        postgis_version = check_postgis_connection()
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail="Database connection failed",
+            detail="Database or PostGIS check failed",
         ) from exc
 
-    if not is_connected:
-        raise HTTPException(status_code=503, detail="Database check failed")
-
-    return {"status": "ok"}
+    return {"status": "ok", "postgis_version": postgis_version}

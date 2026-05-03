@@ -57,7 +57,7 @@ No subas el archivo `.env` al repositorio. Usa `.env.example` como referencia de
 
 ## Backend local
 
-El backend usa FastAPI y lee la configuracion de base de datos desde las variables definidas en `.env`.
+El backend usa FastAPI y lee la configuracion de base de datos desde las variables `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST` y `POSTGRES_PORT` definidas en `.env`.
 
 ### Requisitos
 
@@ -94,7 +94,23 @@ uvicorn app.main:app --reload
 
 La API queda disponible por defecto en `http://127.0.0.1:8000`.
 
+### Probar endpoints
+
+En otra terminal:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8000/db/health
+```
+
+En macOS o Linux:
+
+```bash
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/db/health
+```
+
 Endpoints iniciales:
 
 - `GET /health` comprueba que la API responde.
-- `GET /db/health` comprueba que la API puede conectar con PostgreSQL.
+- `GET /db/health` comprueba que la API puede conectar con PostgreSQL y que PostGIS esta disponible.
