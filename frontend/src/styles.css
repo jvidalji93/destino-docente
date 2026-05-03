@@ -143,6 +143,10 @@ input {
   border-bottom: 1px solid #d7dde5;
 }
 
+.results-header.list-header {
+  border-top: 1px solid #d7dde5;
+}
+
 .results-header h2 {
   margin: 0;
   font-size: 18px;
@@ -173,6 +177,18 @@ input {
   cursor: not-allowed;
 }
 
+.download-button.primary-action {
+  color: #ffffff;
+  border-color: #2563eb;
+  background: #2563eb;
+}
+
+.download-button.primary-action:disabled {
+  color: #526071;
+  border-color: #d7dde5;
+  background: #edf1f6;
+}
+
 .table-wrap {
   overflow: auto;
 }
@@ -199,6 +215,17 @@ th {
   background: #f8fafc;
   font-size: 12px;
   text-transform: uppercase;
+}
+
+.select-column {
+  width: 52px;
+  text-align: center;
+}
+
+.select-column input {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
 }
 
 .sort-button {
@@ -232,6 +259,24 @@ th {
 .empty-state {
   color: #6b7280;
   text-align: center;
+}
+
+.my-list-section {
+  border-top: 1px solid #d7dde5;
+  background: #ffffff;
+}
+
+.text-button {
+  border: 0;
+  padding: 0;
+  color: #b42318;
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 900px) {

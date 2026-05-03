@@ -45,6 +45,13 @@ function escapeCsvValue(value) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
+function sortSchools(schoolsToSort, sortConfig) {
+  return [...schoolsToSort].sort((left, right) => {
+    const result = compareValues(left, right, sortConfig.key);
+    return sortConfig.direction === "asc" ? result : -result;
+  });
+}
+
 function App() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
@@ -55,17 +62,27 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: "distance_km", direction: "asc" });
+  const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
+  const [myList, setMyList] = useState([]);
+  const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
 
   const center = useMemo(
     () => [Number(form.lat) || Number(DEFAULT_SEARCH.lat), Number(form.lng) || Number(DEFAULT_SEARCH.lng)],
     [form.lat, form.lng],
   );
   const sortedSchools = useMemo(() => {
-    return [...schools].sort((left, right) => {
-      const result = compareValues(left, right, sortConfig.key);
-      return sortConfig.direction === "asc" ? result : -result;
-    });
+    return sortSchools(schools, sortConfig);
   }, [schools, sortConfig]);
+  const sortedMyList = useMemo(() => {
+    return sortSchools(myList, myListSortConfig);
+  }, [myList, myListSortConfig]);
+  const selectedVisibleSchools = useMemo(() => {
+    return sortedSchools.filter((school) => selectedSchoolIds.has(school.id));
+  }, [selectedSchoolIds, sortedSchools]);
+  const addableSelectedSchools = useMemo(() => {
+    const listedIds = new Set(myList.map((school) => school.id));
+    return selectedVisibleSchools.filter((school) => !listedIds.has(school.id));
+  }, [myList, selectedVisibleSchools]);
 
   useEffect(() => {
     if (!mapElementRef.current || mapRef.current) {
@@ -144,6 +161,7 @@ function App() {
 
       const data = await response.json();
       setSchools(data);
+      setSelectedSchoolIds(new Set());
       setStatus(data.length === 1 ? "1 centro encontrado." : `${data.length} centros encontrados.`);
     } catch (error) {
       setSchools([]);
@@ -159,42 +177,48 @@ function App() {
   }
 
   function changeSort(key) {
-    setSortConfig((current) => {
-      if (current.key === key) {
-        return {
-          key,
-          direction: current.direction === "asc" ? "desc" : "asc",
-        };
-      }
-
-      return { key, direction: "asc" };
-    });
+    setSortConfig((current) => toggleSort(current, key));
   }
 
-  function getSortLabel(key) {
-    if (sortConfig.key !== key) {
+  function changeMyListSort(key) {
+    setMyListSortConfig((current) => toggleSort(current, key));
+  }
+
+  function toggleSort(current, key) {
+    if (current.key === key) {
+      return {
+        key,
+        direction: current.direction === "asc" ? "desc" : "asc",
+      };
+    }
+
+    return { key, direction: "asc" };
+  }
+
+  function getSortLabel(key, currentSortConfig) {
+    if (currentSortConfig.key !== key) {
       return "";
     }
 
-    return sortConfig.direction === "asc" ? " ASC" : " DESC";
+    return currentSortConfig.direction === "asc" ? " ASC" : " DESC";
   }
 
-  function getAriaSort(key) {
-    if (sortConfig.key !== key) {
+  function getAriaSort(key, currentSortConfig) {
+    if (currentSortConfig.key !== key) {
       return "none";
     }
 
-    return sortConfig.direction === "asc" ? "ascending" : "descending";
+    return currentSortConfig.direction === "asc" ? "ascending" : "descending";
   }
 
-  function downloadCsv() {
-    if (sortedSchools.length === 0) {
+  function downloadCsv(rowsToDownload, filename) {
+    if (rowsToDownload.length === 0) {
       return;
     }
 
     const rows = [
       CSV_COLUMNS.join(","),
-      ...sortedSchools.map((school) =>
+      ...rowsToDownload.map((school) =>
         CSV_COLUMNS.map((column) => escapeCsvValue(school[column])).join(","),
       ),
     ];
@@ -203,11 +227,40 @@ function App() {
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = "schools-nearby.csv";
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  }
+
+  function toggleSchoolSelection(schoolId) {
+    setSelectedSchoolIds((current) => {
+      const nextSelection = new Set(current);
+
+      if (nextSelection.has(schoolId)) {
+        nextSelection.delete(schoolId);
+      } else {
+        nextSelection.add(schoolId);
+      }
+
+      return nextSelection;
+    });
+  }
+
+  function addSelectedToMyList() {
+    if (addableSelectedSchools.length === 0) {
+      return;
+    }
+
+    setMyList((current) => {
+      return [...current, ...addableSelectedSchools];
+    });
+    setSelectedSchoolIds(new Set());
+  }
+
+  function removeFromMyList(schoolId) {
+    setMyList((current) => current.filter((school) => school.id !== schoolId));
   }
 
   function getLocationErrorMessage(error) {
@@ -316,9 +369,17 @@ function App() {
               className="download-button"
               type="button"
               disabled={sortedSchools.length === 0}
-              onClick={downloadCsv}
+              onClick={() => downloadCsv(sortedSchools, "schools-nearby.csv")}
             >
               Descargar CSV
+            </button>
+            <button
+              className="download-button primary-action"
+              type="button"
+              disabled={addableSelectedSchools.length === 0}
+              onClick={addSelectedToMyList}
+            >
+              Añadir a mi lista
             </button>
           </div>
 
@@ -326,45 +387,46 @@ function App() {
             <table>
               <thead>
                 <tr>
-                  <th aria-sort={getAriaSort("name")}>
+                  <th className="select-column">Sel.</th>
+                  <th aria-sort={getAriaSort("name", sortConfig)}>
                     <button
                       className={sortConfig.key === "name" ? "sort-button active" : "sort-button"}
                       type="button"
                       onClick={() => changeSort("name")}
                     >
                       {SORTABLE_COLUMNS.name}
-                      <span>{getSortLabel("name")}</span>
+                      <span>{getSortLabel("name", sortConfig)}</span>
                     </button>
                   </th>
-                  <th aria-sort={getAriaSort("municipality")}>
+                  <th aria-sort={getAriaSort("municipality", sortConfig)}>
                     <button
                       className={sortConfig.key === "municipality" ? "sort-button active" : "sort-button"}
                       type="button"
                       onClick={() => changeSort("municipality")}
                     >
                       {SORTABLE_COLUMNS.municipality}
-                      <span>{getSortLabel("municipality")}</span>
+                      <span>{getSortLabel("municipality", sortConfig)}</span>
                     </button>
                   </th>
-                  <th aria-sort={getAriaSort("ownership")}>
+                  <th aria-sort={getAriaSort("ownership", sortConfig)}>
                     <button
                       className={sortConfig.key === "ownership" ? "sort-button active" : "sort-button"}
                       type="button"
                       onClick={() => changeSort("ownership")}
                     >
                       {SORTABLE_COLUMNS.ownership}
-                      <span>{getSortLabel("ownership")}</span>
+                      <span>{getSortLabel("ownership", sortConfig)}</span>
                     </button>
                   </th>
                   <th>Niveles</th>
-                  <th aria-sort={getAriaSort("distance_km")}>
+                  <th aria-sort={getAriaSort("distance_km", sortConfig)}>
                     <button
                       className={sortConfig.key === "distance_km" ? "sort-button active" : "sort-button"}
                       type="button"
                       onClick={() => changeSort("distance_km")}
                     >
                       {SORTABLE_COLUMNS.distance_km}
-                      <span>{getSortLabel("distance_km")}</span>
+                      <span>{getSortLabel("distance_km", sortConfig)}</span>
                     </button>
                   </th>
                 </tr>
@@ -372,6 +434,14 @@ function App() {
               <tbody>
                 {sortedSchools.map((school) => (
                   <tr key={school.id}>
+                    <td className="select-column">
+                      <input
+                        aria-label={`Seleccionar ${school.name}`}
+                        checked={selectedSchoolIds.has(school.id)}
+                        type="checkbox"
+                        onChange={() => toggleSchoolSelection(school.id)}
+                      />
+                    </td>
                     <td>{school.name}</td>
                     <td>{school.municipality}</td>
                     <td>{school.ownership}</td>
@@ -381,7 +451,7 @@ function App() {
                 ))}
                 {sortedSchools.length === 0 && (
                   <tr>
-                    <td colSpan="5" className="empty-state">
+                    <td colSpan="6" className="empty-state">
                       Sin resultados para mostrar.
                     </td>
                   </tr>
@@ -389,6 +459,103 @@ function App() {
               </tbody>
             </table>
           </div>
+
+          <section className="my-list-section" aria-label="Mi lista">
+            <div className="results-header list-header">
+              <div>
+                <h2>Mi lista</h2>
+                <span>
+                  {myList.length === 1 ? "1 centro seleccionado." : `${myList.length} centros seleccionados.`}
+                </span>
+              </div>
+              <button
+                className="download-button"
+                type="button"
+                disabled={sortedMyList.length === 0}
+                onClick={() => downloadCsv(sortedMyList, "mi-lista-centros.csv")}
+              >
+                Descargar mi lista CSV
+              </button>
+            </div>
+
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th aria-sort={getAriaSort("name", myListSortConfig)}>
+                      <button
+                        className={myListSortConfig.key === "name" ? "sort-button active" : "sort-button"}
+                        type="button"
+                        onClick={() => changeMyListSort("name")}
+                      >
+                        {SORTABLE_COLUMNS.name}
+                        <span>{getSortLabel("name", myListSortConfig)}</span>
+                      </button>
+                    </th>
+                    <th aria-sort={getAriaSort("municipality", myListSortConfig)}>
+                      <button
+                        className={myListSortConfig.key === "municipality" ? "sort-button active" : "sort-button"}
+                        type="button"
+                        onClick={() => changeMyListSort("municipality")}
+                      >
+                        {SORTABLE_COLUMNS.municipality}
+                        <span>{getSortLabel("municipality", myListSortConfig)}</span>
+                      </button>
+                    </th>
+                    <th aria-sort={getAriaSort("ownership", myListSortConfig)}>
+                      <button
+                        className={myListSortConfig.key === "ownership" ? "sort-button active" : "sort-button"}
+                        type="button"
+                        onClick={() => changeMyListSort("ownership")}
+                      >
+                        {SORTABLE_COLUMNS.ownership}
+                        <span>{getSortLabel("ownership", myListSortConfig)}</span>
+                      </button>
+                    </th>
+                    <th>Niveles</th>
+                    <th aria-sort={getAriaSort("distance_km", myListSortConfig)}>
+                      <button
+                        className={myListSortConfig.key === "distance_km" ? "sort-button active" : "sort-button"}
+                        type="button"
+                        onClick={() => changeMyListSort("distance_km")}
+                      >
+                        {SORTABLE_COLUMNS.distance_km}
+                        <span>{getSortLabel("distance_km", myListSortConfig)}</span>
+                      </button>
+                    </th>
+                    <th>Accion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedMyList.map((school) => (
+                    <tr key={school.id}>
+                      <td>{school.name}</td>
+                      <td>{school.municipality}</td>
+                      <td>{school.ownership}</td>
+                      <td>{formatLevels(school.education_levels)}</td>
+                      <td>{school.distance_km}</td>
+                      <td>
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => removeFromMyList(school.id)}
+                        >
+                          Quitar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {sortedMyList.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="empty-state">
+                        Selecciona centros de los resultados y añadelos a tu lista.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </section>
     </main>
