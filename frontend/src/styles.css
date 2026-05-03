@@ -1,0 +1,262 @@
+:root {
+  color: #172033;
+  background: #f4f6f8;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  display: flex;
+  gap: 24px;
+  align-items: end;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #d7dde5;
+  background: #ffffff;
+}
+
+.toolbar h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.toolbar p {
+  margin: 6px 0 0;
+  color: #5f6c7b;
+}
+
+.search-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 160px)) minmax(180px, auto);
+  gap: 12px;
+  align-items: end;
+}
+
+.search-form label {
+  display: grid;
+  gap: 6px;
+  color: #526071;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.search-form input {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #c7d0dc;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #172033;
+  background: #ffffff;
+}
+
+.search-form input:focus {
+  outline: 3px solid #bfdbfe;
+  border-color: #2563eb;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.search-form button {
+  height: 40px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 18px;
+  color: #ffffff;
+  background: #2563eb;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.search-form button:disabled {
+  background: #8aa8e8;
+  cursor: wait;
+}
+
+.search-form .secondary-button {
+  color: #172033;
+  background: #e7edf5;
+}
+
+.search-form .secondary-button:disabled {
+  color: #526071;
+  background: #edf1f6;
+}
+
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(420px, 0.9fr);
+  min-height: 0;
+}
+
+.map-panel,
+.results-panel {
+  min-height: 0;
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+}
+
+.results-panel {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #d7dde5;
+  background: #ffffff;
+}
+
+.results-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid #d7dde5;
+}
+
+.results-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.results-header span {
+  display: block;
+  margin-top: 4px;
+  color: #5f6c7b;
+  font-size: 14px;
+}
+
+.download-button {
+  height: 36px;
+  border: 1px solid #c7d0dc;
+  border-radius: 6px;
+  padding: 0 14px;
+  color: #172033;
+  background: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.download-button:disabled {
+  color: #7d8794;
+  background: #edf1f6;
+  cursor: not-allowed;
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e4e8ee;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #526071;
+  background: #f8fafc;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.sort-button {
+  display: inline-flex;
+  min-height: 28px;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sort-button span {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sort-button.active {
+  color: #1d4ed8;
+}
+
+.empty-state {
+  color: #6b7280;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .toolbar,
+  .workspace {
+    display: block;
+  }
+
+  .search-form {
+    grid-template-columns: 1fr;
+    margin-top: 18px;
+  }
+
+  .form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .map {
+    height: 420px;
+    min-height: 420px;
+  }
+
+  .results-panel {
+    border-left: 0;
+    border-top: 1px solid #d7dde5;
+  }
+}

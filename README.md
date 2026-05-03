@@ -114,3 +114,71 @@ Endpoints iniciales:
 
 - `GET /health` comprueba que la API responde.
 - `GET /db/health` comprueba que la API puede conectar con PostgreSQL y que PostGIS esta disponible.
+
+### Inicializar base de datos
+
+Con la base de datos local en marcha y el entorno virtual activado, ejecuta desde `backend`:
+
+```powershell
+$env:PYTHONPATH = "."
+python -m scripts.init_db
+```
+
+Este script habilita PostGIS si no existe, crea la tabla `schools` y crea el indice espacial sobre `geom`.
+
+### Cargar datos de prueba
+
+Desde `backend`:
+
+```powershell
+$env:PYTHONPATH = "."
+python -m scripts.seed_schools
+```
+
+El seed carga 5 centros educativos de prueba alrededor de Madrid.
+
+### Buscar centros cercanos
+
+Arranca FastAPI y prueba el endpoint:
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:8000/schools/nearby?lat=40.4168&lng=-3.7038&radius_km=5"
+```
+
+En macOS o Linux:
+
+```bash
+curl "http://127.0.0.1:8000/schools/nearby?lat=40.4168&lng=-3.7038&radius_km=5"
+```
+
+La respuesta incluye `id`, `name`, `address`, `municipality`, `province`, `ownership`, `education_levels`, `latitude`, `longitude` y `distance_km`, ordenados por distancia ascendente.
+
+## Frontend local
+
+El frontend usa React, Vite y Leaflet para consultar `GET /schools/nearby` y mostrar los centros en un mapa.
+
+### Requisitos
+
+- Node.js 20 o superior
+- Backend local arrancado en `http://127.0.0.1:8000`
+
+### Instalar dependencias
+
+Desde la raiz del repositorio:
+
+```powershell
+cd frontend
+npm install
+```
+
+### Arrancar el frontend
+
+Desde `frontend`:
+
+```powershell
+npm run dev
+```
+
+Vite mostrara la URL local, normalmente `http://127.0.0.1:5173` o `http://localhost:5173`.
+
+La pantalla permite introducir latitud, longitud y radio en kilometros. Al pulsar `Buscar`, llama a `http://127.0.0.1:8000/schools/nearby`, dibuja los centros devueltos como puntos en Leaflet y muestra una tabla con nombre, municipio, titularidad, niveles educativos y distancia.
