@@ -1,72 +1,54 @@
 # Destino Docente
 
-Herramienta en desarrollo para trabajar con datos de centros educativos y su componente geográfica.
+Aplicacion en desarrollo para consultar centros educativos cercanos usando PostgreSQL/PostGIS, FastAPI, React, Vite y Leaflet.
 
-## Infraestructura local
+## Requisitos Previos En Windows
 
-El proyecto usa PostgreSQL con PostGIS para desarrollo local.
+Instala y comprueba que tienes disponibles estos comandos en PowerShell:
 
-### Requisitos
+- Git: `git --version`
+- Docker Desktop: `docker --version`
+- Python 3.11 o superior: `python --version`
+- Node.js 20 o superior: `node --version`
 
-- Docker
-- Docker Compose
+Docker Desktop debe estar arrancado antes de levantar la base de datos.
 
-### Arrancar la base de datos
+## Primer Arranque Local
 
-1. Crea tu archivo local de variables a partir de la plantilla:
+Los comandos siguientes asumen que estas en la raiz del repositorio.
 
-   ```powershell
-   Copy-Item .env.example .env
-   ```
+### 1. Crear el archivo `.env`
 
-   En macOS o Linux:
+El proyecto no versiona `.env`. Crea tu copia local desde la plantilla:
 
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Cambia los valores de `.env` si necesitas otro usuario, puerto o contraseña local.
-
-3. Levanta PostgreSQL con PostGIS:
-
-   ```bash
-   docker compose --env-file .env -f infra/docker-compose.yml up -d
-   ```
-
-4. Comprueba el estado del contenedor:
-
-   ```bash
-   docker compose --env-file .env -f infra/docker-compose.yml ps
-   ```
-
-La base de datos queda disponible en `localhost:5433` por defecto. Dentro del contenedor PostgreSQL sigue escuchando en el puerto `5432`.
-
-### Parar la base de datos
-
-```bash
-docker compose --env-file .env -f infra/docker-compose.yml down
+```powershell
+Copy-Item .env.example .env
 ```
 
-Para eliminar también los datos locales persistidos:
+Valores locales por defecto:
 
-```bash
-docker compose --env-file .env -f infra/docker-compose.yml down -v
+- Base de datos: `destino_docente`
+- Usuario: `destino`
+- Host: `localhost`
+- Puerto local: `5433`
+
+Si cambias `POSTGRES_PORT`, cambia tambien el puerto de `DATABASE_URL` en tu `.env`.
+
+### 2. Levantar PostgreSQL/PostGIS
+
+```powershell
+docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
 
-No subas el archivo `.env` al repositorio. Usa `.env.example` como referencia de las variables necesarias.
+Comprueba que el contenedor esta en marcha:
 
-## Backend local
+```powershell
+docker compose --env-file .env -f infra/docker-compose.yml ps
+```
 
-El backend usa FastAPI y lee la configuracion de base de datos desde las variables `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST` y `POSTGRES_PORT` definidas en `.env`.
+La base de datos queda disponible desde Windows en `localhost:5433`. Dentro del contenedor PostgreSQL escucha en `5432`.
 
-### Requisitos
-
-- Python 3.11 o superior
-- Base de datos local levantada con Docker Compose
-
-### Instalar dependencias
-
-Desde la raiz del repositorio:
+### 3. Instalar dependencias del backend
 
 ```powershell
 cd backend
@@ -75,49 +57,9 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-En macOS o Linux:
+### 4. Inicializar la base de datos
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### Arrancar el backend
-
-Con la base de datos local en marcha, ejecuta desde `backend`:
-
-```bash
-uvicorn app.main:app --reload
-```
-
-La API queda disponible por defecto en `http://127.0.0.1:8000`.
-
-### Probar endpoints
-
-En otra terminal:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
-Invoke-RestMethod http://127.0.0.1:8000/db/health
-```
-
-En macOS o Linux:
-
-```bash
-curl http://127.0.0.1:8000/health
-curl http://127.0.0.1:8000/db/health
-```
-
-Endpoints iniciales:
-
-- `GET /health` comprueba que la API responde.
-- `GET /db/health` comprueba que la API puede conectar con PostgreSQL y que PostGIS esta disponible.
-
-### Inicializar base de datos
-
-Con la base de datos local en marcha y el entorno virtual activado, ejecuta desde `backend`:
+Desde `backend`, con el entorno virtual activado:
 
 ```powershell
 $env:PYTHONPATH = "."
@@ -126,9 +68,9 @@ python -m scripts.init_db
 
 Este script habilita PostGIS si no existe, crea la tabla `schools` y crea el indice espacial sobre `geom`.
 
-### Cargar datos de prueba
+### 5. Cargar datos de prueba
 
-Desde `backend`:
+Desde `backend`, con el entorno virtual activado:
 
 ```powershell
 $env:PYTHONPATH = "."
@@ -137,41 +79,38 @@ python -m scripts.seed_schools
 
 El seed carga 5 centros educativos de prueba alrededor de Madrid.
 
-### Buscar centros cercanos
+### 6. Arrancar el backend
 
-Arranca FastAPI y prueba el endpoint:
+Desde `backend`, con el entorno virtual activado:
 
 ```powershell
+uvicorn app.main:app --reload
+```
+
+La API queda disponible en:
+
+```text
+http://127.0.0.1:8000
+```
+
+Puedes probarla en otra terminal:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8000/db/health
 Invoke-RestMethod "http://127.0.0.1:8000/schools/nearby?lat=40.4168&lng=-3.7038&radius_km=5"
 ```
 
-En macOS o Linux:
+### 7. Instalar dependencias del frontend
 
-```bash
-curl "http://127.0.0.1:8000/schools/nearby?lat=40.4168&lng=-3.7038&radius_km=5"
-```
-
-La respuesta incluye `id`, `name`, `address`, `municipality`, `province`, `ownership`, `education_levels`, `latitude`, `longitude` y `distance_km`, ordenados por distancia ascendente.
-
-## Frontend local
-
-El frontend usa React, Vite y Leaflet para consultar `GET /schools/nearby` y mostrar los centros en un mapa.
-
-### Requisitos
-
-- Node.js 20 o superior
-- Backend local arrancado en `http://127.0.0.1:8000`
-
-### Instalar dependencias
-
-Desde la raiz del repositorio:
+Abre otra terminal en la raiz del repositorio:
 
 ```powershell
 cd frontend
 npm install
 ```
 
-### Arrancar el frontend
+### 8. Arrancar el frontend
 
 Desde `frontend`:
 
@@ -179,6 +118,48 @@ Desde `frontend`:
 npm run dev
 ```
 
-Vite mostrara la URL local, normalmente `http://127.0.0.1:5173` o `http://localhost:5173`.
+Vite mostrara la URL local, normalmente:
 
-La pantalla permite introducir latitud, longitud y radio en kilometros. Al pulsar `Buscar`, llama a `http://127.0.0.1:8000/schools/nearby`, dibuja los centros devueltos como puntos en Leaflet y muestra una tabla con nombre, municipio, titularidad, niveles educativos y distancia.
+```text
+http://127.0.0.1:5173
+```
+
+## Probar La App De Extremo A Extremo
+
+1. Docker Desktop esta arrancado.
+2. PostgreSQL/PostGIS esta levantado con Docker Compose.
+3. La base de datos fue inicializada con `python -m scripts.init_db`.
+4. Los datos de prueba fueron cargados con `python -m scripts.seed_schools`.
+5. El backend esta arrancado en `http://127.0.0.1:8000`.
+6. El frontend esta arrancado en `http://127.0.0.1:5173`.
+7. Abre el frontend en el navegador.
+8. Usa los valores por defecto de Madrid o pulsa `Usar mi ubicacion`.
+9. Pulsa `Buscar`.
+
+Deberias ver centros educativos como puntos en el mapa y tambien en la tabla. La tabla permite ordenar resultados y descargar el CSV de los resultados visibles.
+
+## Comandos Utiles
+
+Parar la base de datos:
+
+```powershell
+docker compose --env-file .env -f infra/docker-compose.yml down
+```
+
+Parar la base de datos y borrar los datos locales:
+
+```powershell
+docker compose --env-file .env -f infra/docker-compose.yml down -v
+```
+
+Salir del entorno virtual de Python:
+
+```powershell
+deactivate
+```
+
+## Notas
+
+- No subas `.env` al repositorio.
+- No hay login ni busqueda por direccion todavia.
+- El frontend solo llama al backend local en `http://127.0.0.1:8000`.
