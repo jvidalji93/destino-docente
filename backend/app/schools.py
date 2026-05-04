@@ -11,14 +11,23 @@ def find_nearby_schools(lat: float, lng: float, radius_km: float) -> list[dict]:
         )
         SELECT
             schools.id,
+            schools.source,
+            schools.source_id,
+            schools.official_code,
             schools.name,
             schools.address,
+            schools.postal_code,
             schools.municipality,
             schools.province,
+            schools.autonomous_region,
             schools.ownership,
             schools.education_levels,
             schools.latitude,
             schools.longitude,
+            schools.phone,
+            schools.email,
+            schools.website,
+            schools.last_source_update,
             ROUND(
                 (ST_Distance(schools.geom::geography, origin.geom::geography) / 1000.0)::numeric,
                 3
