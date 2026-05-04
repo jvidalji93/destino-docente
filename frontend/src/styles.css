@@ -242,6 +242,32 @@ th {
   text-transform: uppercase;
 }
 
+.listed-row td {
+  background: #f1f5f9;
+  color: #526071;
+}
+
+.school-name-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border: 1px solid #b7d8c4;
+  border-radius: 999px;
+  padding: 0 8px;
+  color: #166534;
+  background: #dcfce7;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .select-column {
   width: 52px;
   text-align: center;
@@ -251,6 +277,10 @@ th {
   width: 18px;
   height: 18px;
   accent-color: #2563eb;
+}
+
+.select-column input:disabled {
+  cursor: not-allowed;
 }
 
 .sort-button {

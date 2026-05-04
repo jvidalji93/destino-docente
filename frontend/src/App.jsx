@@ -77,13 +77,15 @@ function App() {
   const sortedMyList = useMemo(() => {
     return sortSchools(myList, myListSortConfig);
   }, [myList, myListSortConfig]);
+  const myListIds = useMemo(() => {
+    return new Set(myList.map((school) => school.id));
+  }, [myList]);
   const selectedVisibleSchools = useMemo(() => {
     return sortedSchools.filter((school) => selectedSchoolIds.has(school.id));
   }, [selectedSchoolIds, sortedSchools]);
   const addableSelectedSchools = useMemo(() => {
-    const listedIds = new Set(myList.map((school) => school.id));
-    return selectedVisibleSchools.filter((school) => !listedIds.has(school.id));
-  }, [myList, selectedVisibleSchools]);
+    return selectedVisibleSchools.filter((school) => !myListIds.has(school.id));
+  }, [myListIds, selectedVisibleSchools]);
 
   useEffect(() => {
     formRef.current = form;
@@ -264,6 +266,10 @@ function App() {
   }
 
   function toggleSchoolSelection(schoolId) {
+    if (myListIds.has(schoolId)) {
+      return;
+    }
+
     setSelectedSchoolIds((current) => {
       const nextSelection = new Set(current);
 
@@ -469,23 +475,37 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {sortedSchools.map((school) => (
-                  <tr key={school.id}>
-                    <td className="select-column">
-                      <input
-                        aria-label={`Seleccionar ${school.name}`}
-                        checked={selectedSchoolIds.has(school.id)}
-                        type="checkbox"
-                        onChange={() => toggleSchoolSelection(school.id)}
-                      />
-                    </td>
-                    <td>{school.name}</td>
-                    <td>{school.municipality}</td>
-                    <td>{school.ownership}</td>
-                    <td>{formatLevels(school.education_levels)}</td>
-                    <td>{school.distance_km}</td>
-                  </tr>
-                ))}
+                {sortedSchools.map((school) => {
+                  const isInMyList = myListIds.has(school.id);
+
+                  return (
+                    <tr className={isInMyList ? "listed-row" : ""} key={school.id}>
+                      <td className="select-column">
+                        <input
+                          aria-label={
+                            isInMyList
+                              ? `${school.name} ya esta en mi lista`
+                              : `Seleccionar ${school.name}`
+                          }
+                          checked={!isInMyList && selectedSchoolIds.has(school.id)}
+                          disabled={isInMyList}
+                          type="checkbox"
+                          onChange={() => toggleSchoolSelection(school.id)}
+                        />
+                      </td>
+                      <td>
+                        <div className="school-name-cell">
+                          <span>{school.name}</span>
+                          {isInMyList && <span className="status-badge">En mi lista</span>}
+                        </div>
+                      </td>
+                      <td>{school.municipality}</td>
+                      <td>{school.ownership}</td>
+                      <td>{formatLevels(school.education_levels)}</td>
+                      <td>{school.distance_km}</td>
+                    </tr>
+                  );
+                })}
                 {sortedSchools.length === 0 && (
                   <tr>
                     <td colSpan="6" className="empty-state">
