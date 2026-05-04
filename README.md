@@ -84,6 +84,8 @@ python -m scripts.init_db
 
 Este script habilita PostGIS si no existe, crea la tabla `schools` y crea el indice espacial sobre `geom`.
 
+Si ya tenias una base de datos creada antes de cambios de esquema, vuelve a ejecutar este comando. El script es idempotente y añade columnas e indices nuevos sin borrar datos existentes.
+
 ### 5. Cargar datos de prueba
 
 Desde `backend`, con el entorno virtual activado:
@@ -158,25 +160,34 @@ Deberias ver centros educativos como puntos en el mapa y tambien en la tabla. La
 
 Todavia no hay una fuente abierta concreta implementada. Las fuentes candidatas y el formato base se documentan en `docs/data-sources.md`.
 
-El importador base lee un CSV local con estas columnas:
+El importador generico lee un CSV local con estas columnas iniciales:
 
 ```csv
-name,address,municipality,province,autonomous_region,ownership,education_levels,latitude,longitude
+source_id;official_code;name;address;postal_code;municipality;province;autonomous_region;ownership;education_levels;latitude;longitude;phone;email;website
 ```
 
 Desde `backend`, con el entorno virtual activado:
 
 ```powershell
 $env:PYTHONPATH = "."
-python -m scripts.import_schools_csv ..\data\schools.csv
+python -m scripts.import_schools_csv ..\data\raw\andalucia\centros.csv --source andalucia
 ```
 
-Los registros sin `latitude` o `longitude` se saltan y muestran un aviso. El importador no borra datos existentes; si quieres reemplazar todo el contenido de `schools`, usa la opcion explicita `--truncate`:
+Si la base ya existia antes de preparar el importador, ejecuta primero:
 
 ```powershell
 $env:PYTHONPATH = "."
-python -m scripts.import_schools_csv ..\data\schools.csv --truncate
+python -m scripts.init_db
 ```
+
+Opciones utiles:
+
+```powershell
+python -m scripts.import_schools_csv ..\data\raw\andalucia\centros.csv --source andalucia --dry-run
+python -m scripts.import_schools_csv ..\data\raw\andalucia\centros.csv --source andalucia --encoding utf-8-sig --delimiter ";"
+```
+
+Los registros sin `latitude` o `longitude` validas se saltan y muestran un aviso. El importador no borra datos existentes; si encuentra duplicados, actualiza la fila existente. El criterio de duplicado es `source + source_id`, despues `source + official_code`, y por ultimo `name + municipality + province`.
 
 ## Comandos Utiles
 

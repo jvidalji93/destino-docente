@@ -21,12 +21,12 @@ Pendiente de evaluar. Posibles lugares donde buscar:
 - Portal de datos abiertos del Gobierno de Espana.
 - Catalogos estadisticos o educativos publicados por administraciones publicas.
 
-## Formato CSV base del proyecto
+## Formato CSV inicial del proyecto
 
 El importador base espera un CSV local con estas columnas:
 
 ```csv
-name,address,municipality,province,autonomous_region,ownership,education_levels,latitude,longitude
+source_id;official_code;name;address;postal_code;municipality;province;autonomous_region;ownership;education_levels;latitude;longitude;phone;email;website
 ```
 
 Notas:
@@ -34,4 +34,10 @@ Notas:
 - `education_levels` puede separar valores con `|` o `;`.
 - `latitude` y `longitude` son obligatorias para importar un registro.
 - Los registros sin coordenadas se saltan y se muestra un aviso.
-- El importador no borra datos existentes salvo que se ejecute con `--truncate`.
+- La fuente se indica con `--source`, por ejemplo `--source andalucia`.
+- El delimitador por defecto es `;`.
+- La codificacion por defecto es `utf-8-sig`.
+- El importador evita duplicados con este orden:
+  - `source` + `source_id`, si `source_id` existe.
+  - `source` + `official_code`, si `official_code` existe.
+  - `name` + `municipality` + `province`.

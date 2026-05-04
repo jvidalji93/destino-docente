@@ -1,0 +1,6 @@
+﻿source_id;official_code;name;address;postal_code;municipality;province;autonomous_region;ownership;education_levels;latitude;longitude;phone;email;website
+test-001;28000001;CEIP Prueba Centro;Calle Mayor 1;28013;Madrid;Madrid;Comunidad de Madrid;Público;Infantil|Primaria;40.4168;-3.7038;910000001;ceip-centro@example.org;https://example.org/ceip-centro
+test-002;28000002;IES Prueba Norte;Calle Bravo Murillo 100;28020;Madrid;Madrid;Comunidad de Madrid;Público;ESO|Bachillerato;40.4510;-3.7038;910000002;ies-norte@example.org;https://example.org/ies-norte
+test-003;28000003;Colegio Prueba Este;Avenida de América 50;28028;Madrid;Madrid;Comunidad de Madrid;Concertado;Infantil|Primaria|ESO;40.4370;-3.6700;910000003;colegio-este@example.org;https://example.org/colegio-este
+test-004;28000004;CEIP Prueba Sur;Paseo de las Delicias 80;28045;Madrid;Madrid;Comunidad de Madrid;Público;Infantil|Primaria;40.3950;-3.6930;910000004;ceip-sur@example.org;https://example.org/ceip-sur
+test-005;28000005;Colegio Prueba Oeste;Calle Princesa 90;28008;Madrid;Madrid;Comunidad de Madrid;Privado;Infantil|Primaria|ESO|Bachillerato;40.4300;-3.7200;910000005;colegio-oeste@example.org;https://example.org/colegio-oeste
