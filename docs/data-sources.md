@@ -14,6 +14,33 @@ Este documento sirve para registrar posibles fuentes abiertas de centros educati
 
 ## Fuentes candidatas
 
+### Directorio de centros docentes no universitarios de Andalucía
+
+- Nombre de la fuente: Directorio de centros docentes no universitarios de Andalucía.
+- Publicador: Junta de Andalucía, Consejería de Desarrollo Educativo y Formación Profesional.
+- Licencia: Reconocimiento 4.0 Internacional (CC BY 4.0).
+- Curso usado inicialmente: 2024/2025.
+- URL del dataset: https://www.juntadeandalucia.es/datosabiertos/portal/dataset/directorio-de-centros-docentes-de-andalucia
+- URL directa CSV 2024/2025: https://www.juntadeandalucia.es/datosabiertos/portal/dataset/e039df22-4b82-4d0d-9884-0ab5952e24e4/resource/b5924e81-0b53-4418-9d93-b1f39ba1ef65/download/da_centros.csv
+
+Campos principales usados:
+
+- `codigo`
+- `D_DENOMINA`
+- `D_ESPECIFICA`
+- `D_TIPO`
+- `D_DOMICILIO`
+- `D_MUNICIPIO`
+- `D_PROVINCIA`
+- `C_POSTAL`
+- `N_TELEFONO`
+- `Correo_e`
+- `N_LATITUD`
+- `N_LONGITUD`
+- Columnas de enseñanzas, como `pub_inf2`, `pub_pri`, `pub_eso`, `pub_bach_ord`, `pub_fpgm_ord`, `pub_idi`, `pub_Ens_Mus`, `pub_Ens_Dan`, `pub_ee`.
+
+## Otras fuentes candidatas
+
 Pendiente de evaluar. Posibles lugares donde buscar:
 
 - Portales de datos abiertos de comunidades autonomas.

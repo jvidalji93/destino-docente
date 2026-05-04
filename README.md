@@ -158,7 +158,48 @@ Deberias ver centros educativos como puntos en el mapa y tambien en la tabla. La
 
 ## Importar Datos Desde CSV
 
-Todavia no hay una fuente abierta concreta implementada. Las fuentes candidatas y el formato base se documentan en `docs/data-sources.md`.
+Las fuentes abiertas candidatas y el formato base se documentan en `docs/data-sources.md`.
+
+### Andalucía
+
+Fuente oficial: Directorio de centros docentes no universitarios de Andalucía, Junta de Andalucía, curso 2024/2025.
+
+Descarga el CSV original desde la raiz del repositorio:
+
+```powershell
+New-Item -ItemType Directory -Force data\raw\andalucia
+Invoke-WebRequest -Uri "https://www.juntadeandalucia.es/datosabiertos/portal/dataset/e039df22-4b82-4d0d-9884-0ab5952e24e4/resource/b5924e81-0b53-4418-9d93-b1f39ba1ef65/download/da_centros.csv" -OutFile "data\raw\andalucia\da_centros.csv"
+```
+
+Si ya tienes `data\raw\andalucia\da_centros.csv`, transforma el CSV oficial al formato normalizado desde `backend`:
+
+```powershell
+$env:PYTHONPATH = "."
+python -m scripts.transform_andalucia_schools
+```
+
+Para transformar solo una provincia:
+
+```powershell
+$env:PYTHONPATH = "."
+python -m scripts.transform_andalucia_schools --province Almería
+```
+
+El CSV normalizado se genera en:
+
+```text
+data/processed/andalucia/andalucia_schools_normalized.csv
+```
+
+Importa el CSV normalizado:
+
+```powershell
+$env:PYTHONPATH = "."
+python -m scripts.import_schools_csv ..\data\processed\andalucia\andalucia_schools_normalized.csv --source andalucia --dry-run
+python -m scripts.import_schools_csv ..\data\processed\andalucia\andalucia_schools_normalized.csv --source andalucia
+```
+
+### Importador genérico
 
 El importador generico lee un CSV local con estas columnas iniciales:
 
