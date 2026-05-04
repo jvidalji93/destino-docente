@@ -48,6 +48,22 @@ docker compose --env-file .env -f infra/docker-compose.yml ps
 
 La base de datos queda disponible desde Windows en `localhost:5433`. Dentro del contenedor PostgreSQL escucha en `5432`.
 
+### Inspeccionar la base de datos con Adminer
+
+El entorno local incluye Adminer solo para desarrollo. Accede desde el navegador:
+
+```text
+http://localhost:8081
+```
+
+Datos de conexion:
+
+- Sistema: `PostgreSQL`
+- Servidor: `db`
+- Usuario: valor de `POSTGRES_USER` en `.env`
+- Contrasena: valor de `POSTGRES_PASSWORD` en `.env`
+- Base de datos: valor de `POSTGRES_DB` en `.env`
+
 ### 3. Instalar dependencias del backend
 
 ```powershell
