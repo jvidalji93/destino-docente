@@ -146,11 +146,60 @@ select {
   min-height: 0;
 }
 
+.map-panel {
+  position: relative;
+}
+
 .map {
   width: 100%;
   height: 100%;
   min-height: 520px;
   cursor: crosshair;
+}
+
+.map-legend {
+  position: absolute;
+  right: 16px;
+  bottom: 24px;
+  z-index: 500;
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d7dde5;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #172033;
+  background: rgba(255, 255, 255, 0.94);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.map-legend span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #0f172a;
+  border-radius: 999px;
+}
+
+.legend-search {
+  border-color: #7f1d1d;
+  background: #ef4444;
+}
+
+.legend-school {
+  background: #16a34a;
+}
+
+.legend-listed {
+  border-color: #92400e;
+  background: #f59e0b;
 }
 
 .results-panel {

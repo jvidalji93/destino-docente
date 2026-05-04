@@ -256,19 +256,23 @@ function App() {
       .addTo(layer);
 
     sortedSchools.forEach((school) => {
+      const isInMyList = myListIds.has(school.id);
+
       L.circleMarker([school.latitude, school.longitude], {
-        radius: 8,
-        color: "#0f172a",
-        fillColor: "#16a34a",
+        radius: isInMyList ? 9 : 8,
+        color: isInMyList ? "#92400e" : "#0f172a",
+        fillColor: isInMyList ? "#f59e0b" : "#16a34a",
         fillOpacity: 0.9,
-        weight: 2,
+        weight: isInMyList ? 3 : 2,
       })
         .bindPopup(
-          `<strong>${school.name}</strong><br>${school.municipality}<br>${school.distance_km} km`,
+          `<strong>${school.name}</strong><br>${school.municipality}<br>${school.distance_km} km${
+            isInMyList ? "<br>En mi lista" : ""
+          }`,
         )
         .addTo(layer);
     });
-  }, [center, form.radius_km, sortedSchools]);
+  }, [center, form.radius_km, myListIds, sortedSchools]);
 
   function updateForm(event) {
     const { name, value } = event.target;
@@ -294,7 +298,10 @@ function App() {
       }
 
       if (name === "maxDistanceKm" && value !== "") {
-        nextFilters.maxDistanceKm = String(Math.min(Number(value), radiusKm));
+        const requestedDistance = Number(value);
+        nextFilters.maxDistanceKm = Number.isFinite(requestedDistance)
+          ? String(Math.max(0, Math.min(requestedDistance, radiusKm)))
+          : current.maxDistanceKm;
       }
 
       return nextFilters;
@@ -531,6 +538,20 @@ function App() {
       <section className="workspace">
         <div className="map-panel">
           <div ref={mapElementRef} className="map" aria-label="Mapa de centros educativos" />
+          <div className="map-legend" aria-label="Leyenda del mapa">
+            <span>
+              <i className="legend-dot legend-search" />
+              Ubicación de búsqueda
+            </span>
+            <span>
+              <i className="legend-dot legend-school" />
+              Centro encontrado
+            </span>
+            <span>
+              <i className="legend-dot legend-listed" />
+              Centro en mi lista
+            </span>
+          </div>
         </div>
 
         <div className="results-panel">
