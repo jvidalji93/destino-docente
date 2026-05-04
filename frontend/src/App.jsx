@@ -7,6 +7,15 @@ const DEFAULT_SEARCH = {
   lng: "-3.7038",
   radius_km: "5",
 };
+const DEFAULT_FILTERS = {
+  text: "",
+  province: "",
+  municipality: "",
+  ownership: "",
+  educationLevel: "",
+  maxDistanceKm: "",
+  hideListed: false,
+};
 const SORTABLE_COLUMNS = {
   distance_km: "Distancia km",
   name: "Nombre",
@@ -27,7 +36,18 @@ const CSV_COLUMNS = [
 ];
 
 function formatLevels(levels) {
-  return Array.isArray(levels) ? levels.join(", ") : "";
+  return getEducationLevels(levels).join(", ");
+}
+
+function getEducationLevels(levels) {
+  if (Array.isArray(levels)) {
+    return levels.map((level) => String(level).trim()).filter(Boolean);
+  }
+
+  return String(levels ?? "")
+    .split("|")
+    .map((level) => level.trim())
+    .filter(Boolean);
 }
 
 function compareValues(left, right, key) {
@@ -52,6 +72,23 @@ function sortSchools(schoolsToSort, sortConfig) {
   });
 }
 
+function uniqueSorted(values) {
+  return [...new Set(values.filter(Boolean))].sort((left, right) =>
+    left.localeCompare(right, "es", { sensitivity: "base" }),
+  );
+}
+
+function matchesText(school, text) {
+  if (!text.trim()) {
+    return true;
+  }
+
+  const query = text.trim().toLocaleLowerCase("es");
+  return [school.name, school.address, school.municipality, school.province].some((value) =>
+    String(value ?? "").toLocaleLowerCase("es").includes(query),
+  );
+}
+
 function App() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
@@ -63,6 +100,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: "distance_km", direction: "asc" });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
   const [myList, setMyList] = useState([]);
   const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
@@ -71,15 +109,70 @@ function App() {
     () => [Number(form.lat) || Number(DEFAULT_SEARCH.lat), Number(form.lng) || Number(DEFAULT_SEARCH.lng)],
     [form.lat, form.lng],
   );
-  const sortedSchools = useMemo(() => {
-    return sortSchools(schools, sortConfig);
-  }, [schools, sortConfig]);
-  const sortedMyList = useMemo(() => {
-    return sortSchools(myList, myListSortConfig);
-  }, [myList, myListSortConfig]);
   const myListIds = useMemo(() => {
     return new Set(myList.map((school) => school.id));
   }, [myList]);
+  const provinceOptions = useMemo(() => {
+    return uniqueSorted(schools.map((school) => school.province));
+  }, [schools]);
+  const municipalityOptions = useMemo(() => {
+    return uniqueSorted(
+      schools
+        .filter((school) => !filters.province || school.province === filters.province)
+        .map((school) => school.municipality),
+    );
+  }, [filters.province, schools]);
+  const ownershipOptions = useMemo(() => {
+    return uniqueSorted(schools.map((school) => school.ownership));
+  }, [schools]);
+  const educationLevelOptions = useMemo(() => {
+    return uniqueSorted(schools.flatMap((school) => getEducationLevels(school.education_levels)));
+  }, [schools]);
+  const filteredSchools = useMemo(() => {
+    const maxDistance = Number(filters.maxDistanceKm);
+    const radiusKm = Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km);
+
+    return schools.filter((school) => {
+      if (!matchesText(school, filters.text)) {
+        return false;
+      }
+
+      if (filters.province && school.province !== filters.province) {
+        return false;
+      }
+
+      if (filters.municipality && school.municipality !== filters.municipality) {
+        return false;
+      }
+
+      if (filters.ownership && school.ownership !== filters.ownership) {
+        return false;
+      }
+
+      if (
+        filters.educationLevel &&
+        !getEducationLevels(school.education_levels).includes(filters.educationLevel)
+      ) {
+        return false;
+      }
+
+      if (filters.hideListed && myListIds.has(school.id)) {
+        return false;
+      }
+
+      if (filters.maxDistanceKm && Number(school.distance_km) > Math.min(maxDistance, radiusKm)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [filters, form.radius_km, myListIds, schools]);
+  const sortedSchools = useMemo(() => {
+    return sortSchools(filteredSchools, sortConfig);
+  }, [filteredSchools, sortConfig]);
+  const sortedMyList = useMemo(() => {
+    return sortSchools(myList, myListSortConfig);
+  }, [myList, myListSortConfig]);
   const selectedVisibleSchools = useMemo(() => {
     return sortedSchools.filter((school) => selectedSchoolIds.has(school.id));
   }, [selectedSchoolIds, sortedSchools]);
@@ -90,6 +183,18 @@ function App() {
   useEffect(() => {
     formRef.current = form;
   }, [form]);
+
+  useEffect(() => {
+    const radiusKm = Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km);
+
+    setFilters((current) => {
+      if (!current.maxDistanceKm || Number(current.maxDistanceKm) <= radiusKm) {
+        return current;
+      }
+
+      return { ...current, maxDistanceKm: String(radiusKm) };
+    });
+  }, [form.radius_km]);
 
   useEffect(() => {
     if (!mapElementRef.current || mapRef.current) {
@@ -172,6 +277,32 @@ function App() {
       formRef.current = nextForm;
       return nextForm;
     });
+  }
+
+  function updateFilter(event) {
+    const { checked, name, type, value } = event.target;
+    const radiusKm = Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km);
+
+    setFilters((current) => {
+      const nextFilters = {
+        ...current,
+        [name]: type === "checkbox" ? checked : value,
+      };
+
+      if (name === "province") {
+        nextFilters.municipality = "";
+      }
+
+      if (name === "maxDistanceKm" && value !== "") {
+        nextFilters.maxDistanceKm = String(Math.min(Number(value), radiusKm));
+      }
+
+      return nextFilters;
+    });
+  }
+
+  function clearFilters() {
+    setFilters(DEFAULT_FILTERS);
   }
 
   async function runSearch(searchValues) {
@@ -407,6 +538,9 @@ function App() {
             <div>
               <h2>Resultados</h2>
               <span>{status}</span>
+              <span className="result-count">
+                Mostrando {sortedSchools.length} de {schools.length} centros
+              </span>
             </div>
             <button
               className="download-button"
@@ -425,6 +559,94 @@ function App() {
               Añadir a mi lista
             </button>
           </div>
+
+          <section className="filters-panel" aria-label="Filtros de resultados">
+            <label className="filter-field filter-field-wide">
+              Texto libre
+              <input
+                name="text"
+                placeholder="Nombre, direccion, municipio o provincia"
+                type="search"
+                value={filters.text}
+                onChange={updateFilter}
+              />
+            </label>
+
+            <label className="filter-field">
+              Provincia
+              <select name="province" value={filters.province} onChange={updateFilter}>
+                <option value="">Todas</option>
+                {provinceOptions.map((province) => (
+                  <option key={province} value={province}>
+                    {province}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="filter-field">
+              Municipio
+              <select name="municipality" value={filters.municipality} onChange={updateFilter}>
+                <option value="">Todos</option>
+                {municipalityOptions.map((municipality) => (
+                  <option key={municipality} value={municipality}>
+                    {municipality}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="filter-field">
+              Titularidad
+              <select name="ownership" value={filters.ownership} onChange={updateFilter}>
+                <option value="">Todas</option>
+                {ownershipOptions.map((ownership) => (
+                  <option key={ownership} value={ownership}>
+                    {ownership}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="filter-field">
+              Nivel educativo
+              <select name="educationLevel" value={filters.educationLevel} onChange={updateFilter}>
+                <option value="">Todos</option>
+                {educationLevelOptions.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="filter-field">
+              Distancia max. km
+              <input
+                max={Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km)}
+                min="0"
+                name="maxDistanceKm"
+                step="0.1"
+                type="number"
+                value={filters.maxDistanceKm}
+                onChange={updateFilter}
+              />
+            </label>
+
+            <label className="filter-check">
+              <input
+                checked={filters.hideListed}
+                name="hideListed"
+                type="checkbox"
+                onChange={updateFilter}
+              />
+              Ocultar centros ya añadidos a mi lista
+            </label>
+
+            <button className="download-button" type="button" onClick={clearFilters}>
+              Limpiar filtros
+            </button>
+          </section>
 
           <div className="table-wrap">
             <table>
@@ -509,7 +731,7 @@ function App() {
                 {sortedSchools.length === 0 && (
                   <tr>
                     <td colSpan="6" className="empty-state">
-                      Sin resultados para mostrar.
+                      No hay centros que coincidan con los filtros actuales.
                     </td>
                   </tr>
                 )}
