@@ -16,14 +16,24 @@ const DEFAULT_FILTERS = {
   maxDistanceKm: "",
   hideListed: false,
 };
+const DEFAULT_SCORE_CRITERIA = {
+  distance: true,
+  municipality: false,
+  preferredMunicipalities: "",
+  ownership: false,
+  preferredOwnership: "",
+  educationLevel: false,
+  preferredEducationLevel: "",
+};
 const MY_LIST_STORAGE_KEY = "destino-docente.my-list";
 const SORTABLE_COLUMNS = {
   distance_km: "Distancia km",
   name: "Nombre",
   municipality: "Municipio",
   ownership: "Titularidad",
+  score: "Puntuacion",
 };
-const CSV_COLUMNS = [
+const BASE_CSV_COLUMNS = [
   "id",
   "name",
   "address",
@@ -35,6 +45,7 @@ const CSV_COLUMNS = [
   "longitude",
   "distance_km",
 ];
+const SCORE_CSV_COLUMN = "score";
 
 function formatLevels(levels) {
   return getEducationLevels(levels).join(", ");
@@ -52,8 +63,8 @@ function getEducationLevels(levels) {
 }
 
 function compareValues(left, right, key) {
-  if (key === "distance_km") {
-    return Number(left[key]) - Number(right[key]);
+  if (key === "distance_km" || key === "score") {
+    return Number(left[key] ?? 0) - Number(right[key] ?? 0);
   }
 
   return String(left[key] ?? "").localeCompare(String(right[key] ?? ""), "es", {
@@ -64,6 +75,11 @@ function compareValues(left, right, key) {
 function escapeCsvValue(value) {
   const text = Array.isArray(value) ? value.join("|") : String(value ?? "");
   return `"${text.replaceAll('"', '""')}"`;
+}
+
+function getCsvColumns(rows) {
+  const hasScore = rows.some((school) => school.score !== undefined && school.score !== null);
+  return hasScore ? [...BASE_CSV_COLUMNS, SCORE_CSV_COLUMN] : BASE_CSV_COLUMNS;
 }
 
 function sortSchools(schoolsToSort, sortConfig) {
@@ -88,6 +104,53 @@ function matchesText(school, text) {
   return [school.name, school.address, school.municipality, school.province].some((value) =>
     String(value ?? "").toLocaleLowerCase("es").includes(query),
   );
+}
+
+function normalizeForMatch(value) {
+  return String(value ?? "").trim().toLocaleLowerCase("es");
+}
+
+function getPreferredMunicipalities(value) {
+  return value
+    .split(",")
+    .map((municipality) => normalizeForMatch(municipality))
+    .filter(Boolean);
+}
+
+function calculateSchoolScore(school, scoreCriteria, radiusKm) {
+  let score = 0;
+  const distanceKm = Number(school.distance_km);
+  const searchRadiusKm = Number(radiusKm) || Number(DEFAULT_SEARCH.radius_km);
+
+  if (scoreCriteria.distance && Number.isFinite(distanceKm) && searchRadiusKm > 0) {
+    const normalizedDistance = Math.min(distanceKm, searchRadiusKm) / searchRadiusKm;
+    score += Math.max(0, Math.round((1 - normalizedDistance) * 50));
+  }
+
+  if (scoreCriteria.municipality) {
+    const preferredMunicipalities = getPreferredMunicipalities(scoreCriteria.preferredMunicipalities);
+    if (preferredMunicipalities.includes(normalizeForMatch(school.municipality))) {
+      score += 20;
+    }
+  }
+
+  if (scoreCriteria.ownership && scoreCriteria.preferredOwnership === school.ownership) {
+    score += 15;
+  }
+
+  if (
+    scoreCriteria.educationLevel &&
+    getEducationLevels(school.education_levels).includes(scoreCriteria.preferredEducationLevel)
+  ) {
+    score += 15;
+  }
+
+  return score;
+}
+
+function stripDerivedSchoolFields(school) {
+  const { score, ...storedSchool } = school;
+  return storedSchool;
 }
 
 function loadStoredMyList() {
@@ -116,6 +179,7 @@ function App() {
   const [isLocating, setIsLocating] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: "distance_km", direction: "asc" });
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [scoreCriteria, setScoreCriteria] = useState(DEFAULT_SCORE_CRITERIA);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
   const [myList, setMyList] = useState(loadStoredMyList);
   const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
@@ -182,9 +246,16 @@ function App() {
       return true;
     });
   }, [filters, form.radius_km, myListIds, schools]);
+  const scoredSchools = useMemo(() => {
+    const radiusKm = Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km);
+    return filteredSchools.map((school) => ({
+      ...school,
+      score: calculateSchoolScore(school, scoreCriteria, radiusKm),
+    }));
+  }, [filteredSchools, form.radius_km, scoreCriteria]);
   const sortedSchools = useMemo(() => {
-    return sortSchools(filteredSchools, sortConfig);
-  }, [filteredSchools, sortConfig]);
+    return sortSchools(scoredSchools, sortConfig);
+  }, [scoredSchools, sortConfig]);
   const sortedMyList = useMemo(() => {
     return sortSchools(myList, myListSortConfig);
   }, [myList, myListSortConfig]);
@@ -327,6 +398,14 @@ function App() {
     });
   }
 
+  function updateScoreCriteria(event) {
+    const { checked, name, type, value } = event.target;
+    setScoreCriteria((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  }
+
   function clearFilters() {
     setFilters(DEFAULT_FILTERS);
   }
@@ -404,10 +483,11 @@ function App() {
       return;
     }
 
+    const csvColumns = getCsvColumns(rowsToDownload);
     const rows = [
-      CSV_COLUMNS.join(","),
+      csvColumns.join(","),
       ...rowsToDownload.map((school) =>
-        CSV_COLUMNS.map((column) => escapeCsvValue(school[column])).join(","),
+        csvColumns.map((column) => escapeCsvValue(school[column])).join(","),
       ),
     ];
     const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -446,7 +526,7 @@ function App() {
     }
 
     setMyList((current) => {
-      return [...current, ...addableSelectedSchools];
+      return [...current, ...addableSelectedSchools.map(stripDerivedSchoolFields)];
     });
     setSelectedSchoolIds(new Set());
   }
@@ -699,6 +779,96 @@ function App() {
             </button>
           </section>
 
+          <section className="scoring-panel" aria-label="Criterios de ordenacion">
+            <div className="scoring-heading">
+              <h3>Criterios de ordenacion</h3>
+              <p>
+                Puntuacion orientativa: distancia hasta 50 puntos, municipio preferido +20,
+                titularidad +15 y nivel educativo +15.
+              </p>
+            </div>
+
+            <label className="score-toggle">
+              <input
+                checked={scoreCriteria.distance}
+                name="distance"
+                type="checkbox"
+                onChange={updateScoreCriteria}
+              />
+              Menor distancia
+            </label>
+
+            <label className="score-field score-field-wide">
+              <span>
+                <input
+                  checked={scoreCriteria.municipality}
+                  name="municipality"
+                  type="checkbox"
+                  onChange={updateScoreCriteria}
+                />
+                Municipio preferido
+              </span>
+              <input
+                disabled={!scoreCriteria.municipality}
+                name="preferredMunicipalities"
+                placeholder="Madrid, Getafe, Leganes"
+                type="text"
+                value={scoreCriteria.preferredMunicipalities}
+                onChange={updateScoreCriteria}
+              />
+            </label>
+
+            <label className="score-field">
+              <span>
+                <input
+                  checked={scoreCriteria.ownership}
+                  name="ownership"
+                  type="checkbox"
+                  onChange={updateScoreCriteria}
+                />
+                Titularidad preferida
+              </span>
+              <select
+                disabled={!scoreCriteria.ownership}
+                name="preferredOwnership"
+                value={scoreCriteria.preferredOwnership}
+                onChange={updateScoreCriteria}
+              >
+                <option value="">Selecciona</option>
+                {ownershipOptions.map((ownership) => (
+                  <option key={ownership} value={ownership}>
+                    {ownership}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="score-field">
+              <span>
+                <input
+                  checked={scoreCriteria.educationLevel}
+                  name="educationLevel"
+                  type="checkbox"
+                  onChange={updateScoreCriteria}
+                />
+                Nivel preferido
+              </span>
+              <select
+                disabled={!scoreCriteria.educationLevel}
+                name="preferredEducationLevel"
+                value={scoreCriteria.preferredEducationLevel}
+                onChange={updateScoreCriteria}
+              >
+                <option value="">Selecciona</option>
+                {educationLevelOptions.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
+
           <div className="table-wrap">
             <table>
               <thead>
@@ -745,6 +915,16 @@ function App() {
                       <span>{getSortLabel("distance_km", sortConfig)}</span>
                     </button>
                   </th>
+                  <th aria-sort={getAriaSort("score", sortConfig)}>
+                    <button
+                      className={sortConfig.key === "score" ? "sort-button active" : "sort-button"}
+                      type="button"
+                      onClick={() => changeSort("score")}
+                    >
+                      {SORTABLE_COLUMNS.score}
+                      <span>{getSortLabel("score", sortConfig)}</span>
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -776,12 +956,13 @@ function App() {
                       <td>{school.ownership}</td>
                       <td>{formatLevels(school.education_levels)}</td>
                       <td>{school.distance_km}</td>
+                      <td>{school.score}</td>
                     </tr>
                   );
                 })}
                 {sortedSchools.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="empty-state">
+                    <td colSpan="7" className="empty-state">
                       No hay centros que coincidan con los filtros actuales.
                     </td>
                   </tr>
