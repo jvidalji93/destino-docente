@@ -247,6 +247,8 @@ function App() {
   const [scoreCriteria, setScoreCriteria] = useState(DEFAULT_SCORE_CRITERIA);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [scoreCriteriaOpen, setScoreCriteriaOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("search");
+  const [addFeedbackCount, setAddFeedbackCount] = useState(0);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
   const [myList, setMyList] = useState(loadStoredMyList);
   const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
@@ -695,6 +697,8 @@ function App() {
       return;
     }
 
+    const addedCount = addableSelectedSchools.length;
+
     setMyList((current) => {
       return [
         ...current,
@@ -704,6 +708,7 @@ function App() {
         })),
       ];
     });
+    setAddFeedbackCount(addedCount);
     setSelectedSchoolIds(new Set());
   }
 
@@ -789,7 +794,28 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell active-tab-${activeTab}`}>
+      <nav className="tab-nav" aria-label="Navegacion principal">
+        <button
+          aria-selected={activeTab === "search"}
+          className={activeTab === "search" ? "tab-button active" : "tab-button"}
+          role="tab"
+          type="button"
+          onClick={() => setActiveTab("search")}
+        >
+          Buscar centros
+        </button>
+        <button
+          aria-selected={activeTab === "list"}
+          className={activeTab === "list" ? "tab-button active" : "tab-button"}
+          role="tab"
+          type="button"
+          onClick={() => setActiveTab("list")}
+        >
+          Mi lista ({myList.length})
+        </button>
+      </nav>
+
       <section className="toolbar" aria-label="Busqueda de centros">
         <div>
           <h1>Destino Docente</h1>
@@ -1127,7 +1153,20 @@ function App() {
             </section>
           )}
 
-          <div className="table-wrap">
+          {addFeedbackCount > 0 && (
+            <section className="add-feedback" aria-live="polite">
+              <span>
+                {addFeedbackCount === 1
+                  ? "Se ha añadido 1 centro a Mi lista"
+                  : `Se han añadido ${addFeedbackCount} centros a Mi lista`}
+              </span>
+              <button type="button" onClick={() => setActiveTab("list")}>
+                Ver mi lista
+              </button>
+            </section>
+          )}
+
+          <div className="table-wrap results-table-wrap">
             <table>
               <thead>
                 <tr>
@@ -1288,7 +1327,7 @@ function App() {
               )}
             </div>
 
-            <div className="table-wrap">
+            <div className="table-wrap my-list-table-wrap">
               <table>
                 <thead>
                   <tr>
