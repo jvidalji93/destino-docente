@@ -175,6 +175,49 @@ function truncateSummaryValue(value) {
   return text.length > 32 ? `${text.slice(0, 29)}...` : text;
 }
 
+function countValues(values) {
+  return values.filter(Boolean).reduce((counts, value) => {
+    return {
+      ...counts,
+      [value]: (counts[value] ?? 0) + 1,
+    };
+  }, {});
+}
+
+function getEducationLevelCombination(levels) {
+  const educationLevels = getEducationLevels(levels);
+  return educationLevels.length > 0 ? educationLevels.join(" + ") : "";
+}
+
+function formatUniqueList(values, limit = 4) {
+  const uniqueValues = uniqueSorted(values);
+
+  if (uniqueValues.length === 0) {
+    return "Sin datos";
+  }
+
+  const visibleValues = uniqueValues.slice(0, limit);
+  const remainingCount = uniqueValues.length - visibleValues.length;
+  return remainingCount > 0 ? `${visibleValues.join(" · ")} · +${remainingCount} más` : visibleValues.join(" · ");
+}
+
+function formatCounts(counts, limit = 4) {
+  const entries = Object.entries(counts).sort((left, right) => {
+    const countComparison = right[1] - left[1];
+    return countComparison !== 0
+      ? countComparison
+      : left[0].localeCompare(right[0], "es", { sensitivity: "base" });
+  });
+
+  if (entries.length === 0) {
+    return "Sin datos";
+  }
+
+  const visibleEntries = entries.slice(0, limit).map(([label, count]) => `${label}: ${count}`);
+  const remainingCount = entries.length - visibleEntries.length;
+  return remainingCount > 0 ? `${visibleEntries.join(" · ")} · +${remainingCount}` : visibleEntries.join(" · ");
+}
+
 function loadStoredMyList() {
   try {
     const storedValue = window.localStorage.getItem(MY_LIST_STORAGE_KEY);
@@ -281,6 +324,25 @@ function App() {
     return sortSchools(scoredSchools, sortConfig);
   }, [scoredSchools, sortConfig]);
   const sortedMyList = myList;
+  const myListSummary = useMemo(() => {
+    const distances = myList
+      .map((school) => Number(school.distance_km))
+      .filter((distance) => Number.isFinite(distance));
+    const averageDistance =
+      distances.length > 0
+        ? distances.reduce((total, distance) => total + distance, 0) / distances.length
+        : null;
+
+    return {
+      total: myList.length,
+      averageDistance,
+      municipalities: myList.map((school) => school.municipality),
+      ownershipCounts: countValues(myList.map((school) => school.ownership)),
+      educationLevelCombinationCounts: countValues(
+        myList.map((school) => getEducationLevelCombination(school.education_levels)),
+      ),
+    };
+  }, [myList]);
   const selectedVisibleSchools = useMemo(() => {
     return sortedSchools.filter((school) => selectedSchoolIds.has(school.id));
   }, [selectedSchoolIds, sortedSchools]);
@@ -1191,6 +1253,39 @@ function App() {
               >
                 Vaciar mi lista
               </button>
+            </div>
+
+            <div className="my-list-summary" aria-label="Resumen de mi lista">
+              {myListSummary.total === 0 ? (
+                <p className="my-list-empty-summary">Mi lista esta vacia. Añade centros para ver el resumen.</p>
+              ) : (
+                <div className="summary-grid">
+                  <div className="summary-item">
+                    <span>Total</span>
+                    <strong>{myListSummary.total}</strong>
+                  </div>
+                  <div className="summary-item">
+                    <span>Distancia media</span>
+                    <strong>
+                      {myListSummary.averageDistance === null
+                        ? "Sin datos"
+                        : `${myListSummary.averageDistance.toFixed(2)} km`}
+                    </strong>
+                  </div>
+                  <div className="summary-item summary-item-wide">
+                    <span>Municipios</span>
+                    <strong>{formatUniqueList(myListSummary.municipalities, 4)}</strong>
+                  </div>
+                  <div className="summary-item summary-item-wide">
+                    <span>Titularidad</span>
+                    <strong>{formatCounts(myListSummary.ownershipCounts)}</strong>
+                  </div>
+                  <div className="summary-item summary-item-wide">
+                    <span>Enseñanzas de los centros seleccionados</span>
+                    <strong>{formatCounts(myListSummary.educationLevelCombinationCounts)}</strong>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="table-wrap">
