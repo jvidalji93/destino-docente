@@ -620,6 +620,40 @@ th {
   cursor: not-allowed;
 }
 
+.position-column {
+  width: 56px;
+  color: #526071;
+  font-weight: 800;
+  text-align: center;
+}
+
+.order-controls {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.order-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #c7d0dc;
+  border-radius: 6px;
+  color: #172033;
+  background: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.order-button:disabled {
+  color: #9aa4b2;
+  background: #edf1f6;
+  cursor: not-allowed;
+}
+
 .sort-button {
   display: inline-flex;
   min-height: 28px;

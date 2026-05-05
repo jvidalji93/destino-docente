@@ -271,9 +271,7 @@ function App() {
   const sortedSchools = useMemo(() => {
     return sortSchools(scoredSchools, sortConfig);
   }, [scoredSchools, sortConfig]);
-  const sortedMyList = useMemo(() => {
-    return sortSchools(myList, myListSortConfig);
-  }, [myList, myListSortConfig]);
+  const sortedMyList = myList;
   const selectedVisibleSchools = useMemo(() => {
     return sortedSchools.filter((school) => selectedSchoolIds.has(school.id));
   }, [selectedSchoolIds, sortedSchools]);
@@ -545,7 +543,11 @@ function App() {
   }
 
   function changeMyListSort(key) {
-    setMyListSortConfig((current) => toggleSort(current, key));
+    setMyListSortConfig((current) => {
+      const nextSortConfig = toggleSort(current, key);
+      setMyList((currentMyList) => sortSchools(currentMyList, nextSortConfig));
+      return nextSortConfig;
+    });
   }
 
   function toggleSort(current, key) {
@@ -630,6 +632,21 @@ function App() {
 
   function removeFromMyList(schoolId) {
     setMyList((current) => current.filter((school) => school.id !== schoolId));
+  }
+
+  function moveMyListItem(index, direction) {
+    setMyList((current) => {
+      const targetIndex = index + direction;
+
+      if (targetIndex < 0 || targetIndex >= current.length) {
+        return current;
+      }
+
+      const nextList = [...current];
+      const [movedSchool] = nextList.splice(index, 1);
+      nextList.splice(targetIndex, 0, movedSchool);
+      return nextList;
+    });
   }
 
   function clearMyList() {
@@ -1159,6 +1176,7 @@ function App() {
               <table>
                 <thead>
                   <tr>
+                    <th>Pos.</th>
                     <th aria-sort={getAriaSort("name", myListSortConfig)}>
                       <button
                         className={myListSortConfig.key === "name" ? "sort-button active" : "sort-button"}
@@ -1200,17 +1218,41 @@ function App() {
                         <span>{getSortLabel("distance_km", myListSortConfig)}</span>
                       </button>
                     </th>
+                    <th>Orden</th>
                     <th>Accion</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedMyList.map((school) => (
+                  {sortedMyList.map((school, index) => (
                     <tr key={school.id}>
+                      <td className="position-column">{index + 1}</td>
                       <td>{school.name}</td>
                       <td>{school.municipality}</td>
                       <td>{school.ownership}</td>
                       <td>{formatLevels(school.education_levels)}</td>
                       <td>{school.distance_km}</td>
+                      <td>
+                        <div className="order-controls">
+                          <button
+                            aria-label={`Subir ${school.name}`}
+                            className="order-button"
+                            disabled={index === 0}
+                            type="button"
+                            onClick={() => moveMyListItem(index, -1)}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            aria-label={`Bajar ${school.name}`}
+                            className="order-button"
+                            disabled={index === sortedMyList.length - 1}
+                            type="button"
+                            onClick={() => moveMyListItem(index, 1)}
+                          >
+                            ↓
+                          </button>
+                        </div>
+                      </td>
                       <td>
                         <button
                           className="text-button"
@@ -1224,7 +1266,7 @@ function App() {
                   ))}
                   {sortedMyList.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="empty-state">
+                      <td colSpan="8" className="empty-state">
                         Selecciona centros de los resultados y añadelos a tu lista.
                       </td>
                     </tr>
