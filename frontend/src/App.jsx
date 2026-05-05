@@ -280,42 +280,45 @@ function App() {
   const addableSelectedSchools = useMemo(() => {
     return selectedVisibleSchools.filter((school) => !myListIds.has(school.id));
   }, [myListIds, selectedVisibleSchools]);
-  const activeFilterSummary = useMemo(() => {
+  const activeFilterChips = useMemo(() => {
     const activeFilters = [];
 
     if (filters.text.trim()) {
-      activeFilters.push(`Texto: ${truncateSummaryValue(filters.text)}`);
+      activeFilters.push({ key: "text", label: `Texto: ${truncateSummaryValue(filters.text)}` });
     }
 
     if (filters.province) {
-      activeFilters.push(`Provincia: ${filters.province}`);
+      activeFilters.push({ key: "province", label: `Provincia: ${filters.province}` });
     }
 
     if (filters.municipality) {
-      activeFilters.push(`Municipio: ${filters.municipality}`);
+      activeFilters.push({ key: "municipality", label: `Municipio: ${filters.municipality}` });
     }
 
     if (filters.ownership) {
-      activeFilters.push(`Titularidad: ${filters.ownership}`);
+      activeFilters.push({ key: "ownership", label: `Titularidad: ${filters.ownership}` });
     }
 
     if (filters.educationLevel) {
-      activeFilters.push(`Nivel: ${filters.educationLevel}`);
+      activeFilters.push({ key: "educationLevel", label: `Nivel: ${filters.educationLevel}` });
     }
 
     if (filters.maxDistanceKm) {
-      activeFilters.push(`Distancia max.: ${filters.maxDistanceKm} km`);
+      activeFilters.push({ key: "maxDistanceKm", label: `Distancia max.: ${filters.maxDistanceKm} km` });
     }
 
     if (filters.hideListed) {
-      activeFilters.push("Oculta centros en mi lista");
+      activeFilters.push({ key: "hideListed", label: "Oculta centros en mi lista" });
     }
 
-    return {
-      count: activeFilters.length,
-      text: activeFilters.join(" · "),
-    };
+    return activeFilters;
   }, [filters]);
+  const activeFilterSummary = useMemo(() => {
+    return {
+      count: activeFilterChips.length,
+      text: activeFilterChips.map((filter) => filter.label).join(" · "),
+    };
+  }, [activeFilterChips]);
   const activeScoreSummary = useMemo(() => {
     const activeCriteria = [];
 
@@ -495,6 +498,13 @@ function App() {
 
   function clearFilters() {
     setFilters(DEFAULT_FILTERS);
+  }
+
+  function clearFilter(filterKey) {
+    setFilters((current) => ({
+      ...current,
+      [filterKey]: typeof current[filterKey] === "boolean" ? false : "",
+    }));
   }
 
   async function runSearch(searchValues) {
@@ -996,6 +1006,26 @@ function App() {
               </div>
             )}
           </section>
+
+          {activeFilterChips.length > 0 && (
+            <section className="active-filters-row" aria-label="Filtros activos">
+              <span className="active-filters-label">Filtros activos:</span>
+              <div className="filter-chips">
+                {activeFilterChips.map((filter) => (
+                  <span className="filter-chip" key={filter.key}>
+                    {filter.label}
+                    <button
+                      aria-label={`Quitar filtro ${filter.label}`}
+                      type="button"
+                      onClick={() => clearFilter(filter.key)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="table-wrap">
             <table>
