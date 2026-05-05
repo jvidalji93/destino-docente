@@ -654,6 +654,24 @@ th {
   cursor: not-allowed;
 }
 
+.notes-input {
+  width: min(260px, 100%);
+  min-width: 180px;
+  resize: vertical;
+  border: 1px solid #c7d0dc;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #172033;
+  background: #ffffff;
+  font: inherit;
+  line-height: 1.35;
+}
+
+.notes-input:focus {
+  outline: 3px solid #bfdbfe;
+  border-color: #2563eb;
+}
+
 .sort-button {
   display: inline-flex;
   min-height: 28px;

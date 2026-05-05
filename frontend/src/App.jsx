@@ -46,6 +46,7 @@ const BASE_CSV_COLUMNS = [
   "distance_km",
 ];
 const SCORE_CSV_COLUMN = "score";
+const NOTES_CSV_COLUMN = "notes";
 
 function formatLevels(levels) {
   return getEducationLevels(levels).join(", ");
@@ -77,9 +78,17 @@ function escapeCsvValue(value) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-function getCsvColumns(rows) {
+function getCsvColumns(rows, extraColumns = []) {
   const hasScore = rows.some((school) => school.score !== undefined && school.score !== null);
-  return hasScore ? [...BASE_CSV_COLUMNS, SCORE_CSV_COLUMN] : BASE_CSV_COLUMNS;
+  const columns = hasScore ? [...BASE_CSV_COLUMNS, SCORE_CSV_COLUMN] : [...BASE_CSV_COLUMNS];
+
+  extraColumns.forEach((column) => {
+    if (!columns.includes(column)) {
+      columns.push(column);
+    }
+  });
+
+  return columns;
 }
 
 function sortSchools(schoolsToSort, sortConfig) {
@@ -577,12 +586,12 @@ function App() {
     return currentSortConfig.direction === "asc" ? "ascending" : "descending";
   }
 
-  function downloadCsv(rowsToDownload, filename) {
+  function downloadCsv(rowsToDownload, filename, extraColumns = []) {
     if (rowsToDownload.length === 0) {
       return;
     }
 
-    const csvColumns = getCsvColumns(rowsToDownload);
+    const csvColumns = getCsvColumns(rowsToDownload, extraColumns);
     const rows = [
       csvColumns.join(","),
       ...rowsToDownload.map((school) =>
@@ -625,7 +634,13 @@ function App() {
     }
 
     setMyList((current) => {
-      return [...current, ...addableSelectedSchools.map(stripDerivedSchoolFields)];
+      return [
+        ...current,
+        ...addableSelectedSchools.map((school) => ({
+          ...stripDerivedSchoolFields(school),
+          notes: "",
+        })),
+      ];
     });
     setSelectedSchoolIds(new Set());
   }
@@ -647,6 +662,12 @@ function App() {
       nextList.splice(targetIndex, 0, movedSchool);
       return nextList;
     });
+  }
+
+  function updateMyListNotes(schoolId, notes) {
+    setMyList((current) =>
+      current.map((school) => (school.id === schoolId ? { ...school, notes } : school)),
+    );
   }
 
   function clearMyList() {
@@ -1158,7 +1179,7 @@ function App() {
                 className="download-button"
                 type="button"
                 disabled={sortedMyList.length === 0}
-                onClick={() => downloadCsv(sortedMyList, "mi-lista-centros.csv")}
+                onClick={() => downloadCsv(sortedMyList, "mi-lista-centros.csv", [NOTES_CSV_COLUMN])}
               >
                 Descargar mi lista CSV
               </button>
@@ -1218,6 +1239,7 @@ function App() {
                         <span>{getSortLabel("distance_km", myListSortConfig)}</span>
                       </button>
                     </th>
+                    <th>Notas</th>
                     <th>Orden</th>
                     <th>Accion</th>
                   </tr>
@@ -1231,6 +1253,16 @@ function App() {
                       <td>{school.ownership}</td>
                       <td>{formatLevels(school.education_levels)}</td>
                       <td>{school.distance_km}</td>
+                      <td>
+                        <textarea
+                          aria-label={`Notas para ${school.name}`}
+                          className="notes-input"
+                          placeholder="Añade una nota"
+                          rows="2"
+                          value={school.notes ?? ""}
+                          onChange={(event) => updateMyListNotes(school.id, event.target.value)}
+                        />
+                      </td>
                       <td>
                         <div className="order-controls">
                           <button
@@ -1266,7 +1298,7 @@ function App() {
                   ))}
                   {sortedMyList.length === 0 && (
                     <tr>
-                      <td colSpan="8" className="empty-state">
+                      <td colSpan="9" className="empty-state">
                         Selecciona centros de los resultados y añadelos a tu lista.
                       </td>
                     </tr>
