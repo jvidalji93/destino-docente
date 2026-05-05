@@ -16,6 +16,7 @@ const DEFAULT_FILTERS = {
   maxDistanceKm: "",
   hideListed: false,
 };
+const MY_LIST_STORAGE_KEY = "destino-docente.my-list";
 const SORTABLE_COLUMNS = {
   distance_km: "Distancia km",
   name: "Nombre",
@@ -89,6 +90,20 @@ function matchesText(school, text) {
   );
 }
 
+function loadStoredMyList() {
+  try {
+    const storedValue = window.localStorage.getItem(MY_LIST_STORAGE_KEY);
+    if (!storedValue) {
+      return [];
+    }
+
+    const parsedValue = JSON.parse(storedValue);
+    return Array.isArray(parsedValue) ? parsedValue : [];
+  } catch (error) {
+    return [];
+  }
+}
+
 function App() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
@@ -102,7 +117,7 @@ function App() {
   const [sortConfig, setSortConfig] = useState({ key: "distance_km", direction: "asc" });
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
-  const [myList, setMyList] = useState([]);
+  const [myList, setMyList] = useState(loadStoredMyList);
   const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
 
   const center = useMemo(
@@ -183,6 +198,10 @@ function App() {
   useEffect(() => {
     formRef.current = form;
   }, [form]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MY_LIST_STORAGE_KEY, JSON.stringify(myList));
+  }, [myList]);
 
   useEffect(() => {
     const radiusKm = Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km);
@@ -434,6 +453,17 @@ function App() {
 
   function removeFromMyList(schoolId) {
     setMyList((current) => current.filter((school) => school.id !== schoolId));
+  }
+
+  function clearMyList() {
+    if (myList.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm("¿Quieres vaciar Mi lista?");
+    if (confirmed) {
+      setMyList([]);
+    }
   }
 
   function getLocationErrorMessage(error) {
@@ -775,6 +805,14 @@ function App() {
                 onClick={() => downloadCsv(sortedMyList, "mi-lista-centros.csv")}
               >
                 Descargar mi lista CSV
+              </button>
+              <button
+                className="download-button danger-action"
+                type="button"
+                disabled={myList.length === 0}
+                onClick={clearMyList}
+              >
+                Vaciar mi lista
               </button>
             </div>
 

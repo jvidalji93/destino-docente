@@ -269,6 +269,18 @@ select {
   background: #edf1f6;
 }
 
+.download-button.danger-action {
+  color: #b42318;
+  border-color: #f3b7b0;
+  background: #fff7f5;
+}
+
+.download-button.danger-action:disabled {
+  color: #7d8794;
+  border-color: #d7dde5;
+  background: #edf1f6;
+}
+
 .filters-panel {
   display: grid;
   grid-template-columns: repeat(3, minmax(140px, 1fr));
