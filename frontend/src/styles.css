@@ -22,11 +22,15 @@ select {
 
 .app-shell {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(380px, 42vw) minmax(480px, 1fr);
+  align-items: start;
+  background: #ffffff;
 }
 
 .toolbar {
+  grid-column: 2;
+  order: 1;
   display: flex;
   gap: 24px;
   align-items: end;
@@ -135,9 +139,7 @@ select {
 }
 
 .workspace {
-  display: flex;
-  flex-direction: column;
-  background: #ffffff;
+  display: contents;
 }
 
 .map-panel,
@@ -146,16 +148,21 @@ select {
 }
 
 .map-panel {
-  position: relative;
+  position: sticky;
+  top: 0;
+  grid-column: 1;
+  grid-row: 1 / span 10;
   order: 4;
-  border-bottom: 1px solid #d7dde5;
+  height: min(720px, 100vh);
+  min-height: 500px;
+  border-right: 1px solid #d7dde5;
 }
 
 .map {
   width: 100%;
-  height: min(500px, 60vh);
-  min-height: 360px;
-  max-height: 500px;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
   cursor: crosshair;
 }
 
@@ -209,7 +216,8 @@ select {
 }
 
 .results-header {
-  order: 1;
+  grid-column: 2;
+  order: 4;
   display: flex;
   gap: 12px;
   align-items: center;
@@ -282,6 +290,7 @@ select {
 }
 
 .filters-panel {
+  grid-column: 2;
   order: 2;
   display: grid;
   grid-template-columns: repeat(3, minmax(140px, 1fr));
@@ -336,6 +345,7 @@ select {
 }
 
 .scoring-panel {
+  grid-column: 2;
   order: 3;
   display: grid;
   grid-template-columns: repeat(3, minmax(140px, 1fr));
@@ -416,6 +426,7 @@ select {
 }
 
 .table-wrap {
+  grid-column: 2;
   order: 5;
   overflow: auto;
 }
@@ -519,6 +530,7 @@ th {
 }
 
 .my-list-section {
+  grid-column: 2;
   order: 6;
   border-top: 1px solid #d7dde5;
   background: #ffffff;
@@ -538,13 +550,18 @@ th {
 }
 
 @media (max-width: 900px) {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+  }
+
   .toolbar {
+    order: 1;
     display: block;
   }
 
   .workspace {
-    display: flex;
-    flex-direction: column;
+    display: contents;
   }
 
   .search-form {
@@ -577,6 +594,30 @@ th {
     height: 360px;
     min-height: 360px;
     max-height: 360px;
+  }
+
+  .map-panel {
+    position: relative;
+    top: auto;
+    grid-column: auto;
+    grid-row: auto;
+    order: 4;
+    height: 360px;
+    min-height: 360px;
+    border-right: 0;
+    border-bottom: 1px solid #d7dde5;
+  }
+
+  .results-header {
+    order: 5;
+  }
+
+  .table-wrap {
+    order: 6;
+  }
+
+  .my-list-section {
+    order: 7;
   }
 
   .results-panel {
