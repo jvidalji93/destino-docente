@@ -344,6 +344,72 @@ select {
   background: #edf1f6;
 }
 
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.confirm-dialog {
+  width: min(440px, 100%);
+  border: 1px solid #d7dde5;
+  border-radius: 8px;
+  padding: 20px;
+  color: #172033;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+.confirm-dialog h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.confirm-dialog p {
+  margin: 12px 0 0;
+  color: #526071;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.dialog-cancel-button,
+.dialog-confirm-button {
+  min-height: 38px;
+  border: 1px solid #c7d0dc;
+  border-radius: 6px;
+  padding: 0 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dialog-cancel-button {
+  color: #172033;
+  background: #ffffff;
+}
+
+.dialog-confirm-button {
+  color: #ffffff;
+  border-color: #2563eb;
+  background: #2563eb;
+}
+
+.dialog-confirm-button.danger {
+  border-color: #b42318;
+  background: #b42318;
+}
+
 .collapsible-section {
   grid-column: 2;
   border-bottom: 1px solid #d7dde5;

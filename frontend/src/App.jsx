@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 
 const API_URL = "http://127.0.0.1:8000/schools/nearby";
@@ -232,6 +232,62 @@ function loadStoredMyList() {
   }
 }
 
+function ConfirmDialog({
+  isOpen,
+  title,
+  message,
+  confirmLabel,
+  cancelLabel,
+  variant = "default",
+  onConfirm,
+  onCancel,
+}) {
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        onCancel();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onCancel]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section
+        aria-labelledby="confirm-dialog-title"
+        aria-modal="true"
+        className="confirm-dialog"
+        role="dialog"
+      >
+        <h2 id="confirm-dialog-title">{title}</h2>
+        <p>{message}</p>
+        <div className="dialog-actions">
+          <button className="dialog-cancel-button" type="button" onClick={onCancel}>
+            {cancelLabel}
+          </button>
+          <button
+            className={variant === "danger" ? "dialog-confirm-button danger" : "dialog-confirm-button"}
+            type="button"
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function App() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
@@ -249,6 +305,7 @@ function App() {
   const [scoreCriteriaOpen, setScoreCriteriaOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("search");
   const [addFeedbackCount, setAddFeedbackCount] = useState(0);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
   const [myList, setMyList] = useState(loadStoredMyList);
   const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
@@ -713,7 +770,25 @@ function App() {
   }
 
   function removeFromMyList(schoolId) {
-    setMyList((current) => current.filter((school) => school.id !== schoolId));
+    const schoolToRemove = myList.find((school) => school.id === schoolId);
+    const hasNotes = String(schoolToRemove?.notes ?? "").trim().length > 0;
+
+    if (!schoolToRemove) {
+      return;
+    }
+
+    setConfirmDialog({
+      title: hasNotes ? "Quitar centro con nota" : "Quitar centro de Mi lista",
+      message: hasNotes
+        ? "Este centro tiene una nota personal. Si lo quitas, también se eliminará la nota. ¿Quieres continuar?"
+        : "¿Seguro que quieres quitar este centro de Mi lista?",
+      confirmLabel: "Quitar centro",
+      cancelLabel: "Cancelar",
+      variant: "danger",
+      onConfirm: () => {
+        setMyList((current) => current.filter((school) => school.id !== schoolId));
+      },
+    });
   }
 
   function moveMyListItem(index, direction) {
@@ -742,10 +817,16 @@ function App() {
       return;
     }
 
-    const confirmed = window.confirm("¿Quieres vaciar Mi lista?");
-    if (confirmed) {
-      setMyList([]);
-    }
+    setConfirmDialog({
+      title: "Vaciar Mi lista",
+      message: "Vas a eliminar todos los centros seleccionados. Esta acción no se puede deshacer.",
+      confirmLabel: "Vaciar lista",
+      cancelLabel: "Cancelar",
+      variant: "danger",
+      onConfirm: () => {
+        setMyList([]);
+      },
+    });
   }
 
   function getLocationErrorMessage(error) {
@@ -1433,7 +1514,7 @@ function App() {
                   {sortedMyList.length === 0 && (
                     <tr>
                       <td colSpan="9" className="empty-state">
-                        Selecciona centros de los resultados y añadelos a tu lista.
+                        Selecciona centros de los resultados y a??delos a tu lista.
                       </td>
                     </tr>
                   )}
@@ -1443,6 +1524,19 @@ function App() {
           </section>
         </div>
       </section>
+      <ConfirmDialog
+        isOpen={Boolean(confirmDialog)}
+        title={confirmDialog?.title ?? ""}
+        message={confirmDialog?.message ?? ""}
+        confirmLabel={confirmDialog?.confirmLabel ?? "Confirmar"}
+        cancelLabel={confirmDialog?.cancelLabel ?? "Cancelar"}
+        variant={confirmDialog?.variant}
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={() => {
+          confirmDialog?.onConfirm();
+          setConfirmDialog(null);
+        }}
+      />
     </main>
   );
 }
