@@ -153,6 +153,19 @@ function stripDerivedSchoolFields(school) {
   return storedSchool;
 }
 
+function getActiveLabel(count) {
+  if (count === 0) {
+    return "Sin activos";
+  }
+
+  return count === 1 ? "1 activo" : `${count} activos`;
+}
+
+function truncateSummaryValue(value) {
+  const text = String(value ?? "").trim();
+  return text.length > 32 ? `${text.slice(0, 29)}...` : text;
+}
+
 function loadStoredMyList() {
   try {
     const storedValue = window.localStorage.getItem(MY_LIST_STORAGE_KEY);
@@ -180,6 +193,8 @@ function App() {
   const [sortConfig, setSortConfig] = useState({ key: "distance_km", direction: "asc" });
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [scoreCriteria, setScoreCriteria] = useState(DEFAULT_SCORE_CRITERIA);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [scoreCriteriaOpen, setScoreCriteriaOpen] = useState(false);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
   const [myList, setMyList] = useState(loadStoredMyList);
   const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
@@ -265,6 +280,78 @@ function App() {
   const addableSelectedSchools = useMemo(() => {
     return selectedVisibleSchools.filter((school) => !myListIds.has(school.id));
   }, [myListIds, selectedVisibleSchools]);
+  const activeFilterSummary = useMemo(() => {
+    const activeFilters = [];
+
+    if (filters.text.trim()) {
+      activeFilters.push(`Texto: ${truncateSummaryValue(filters.text)}`);
+    }
+
+    if (filters.province) {
+      activeFilters.push(`Provincia: ${filters.province}`);
+    }
+
+    if (filters.municipality) {
+      activeFilters.push(`Municipio: ${filters.municipality}`);
+    }
+
+    if (filters.ownership) {
+      activeFilters.push(`Titularidad: ${filters.ownership}`);
+    }
+
+    if (filters.educationLevel) {
+      activeFilters.push(`Nivel: ${filters.educationLevel}`);
+    }
+
+    if (filters.maxDistanceKm) {
+      activeFilters.push(`Distancia max.: ${filters.maxDistanceKm} km`);
+    }
+
+    if (filters.hideListed) {
+      activeFilters.push("Oculta centros en mi lista");
+    }
+
+    return {
+      count: activeFilters.length,
+      text: activeFilters.join(" · "),
+    };
+  }, [filters]);
+  const activeScoreSummary = useMemo(() => {
+    const activeCriteria = [];
+
+    if (scoreCriteria.distance) {
+      activeCriteria.push("Distancia");
+    }
+
+    if (scoreCriteria.municipality) {
+      activeCriteria.push(
+        scoreCriteria.preferredMunicipalities.trim()
+          ? `Municipio preferido: ${truncateSummaryValue(scoreCriteria.preferredMunicipalities)}`
+          : "Municipio preferido",
+      );
+    }
+
+    if (scoreCriteria.ownership) {
+      activeCriteria.push(
+        scoreCriteria.preferredOwnership
+          ? `Titularidad: ${scoreCriteria.preferredOwnership}`
+          : "Titularidad preferida",
+      );
+    }
+
+    if (scoreCriteria.educationLevel) {
+      activeCriteria.push(
+        scoreCriteria.preferredEducationLevel
+          ? `Nivel: ${scoreCriteria.preferredEducationLevel}`
+          : "Nivel preferido",
+      );
+    }
+
+    return {
+      count: activeCriteria.length,
+      text: activeCriteria.join(" · "),
+    };
+  }, [scoreCriteria]);
 
   useEffect(() => {
     formRef.current = form;
@@ -691,8 +778,27 @@ function App() {
             </button>
           </div>
 
-          <section className="filters-panel" aria-label="Filtros de resultados">
-            <label className="filter-field filter-field-wide">
+          <section className="collapsible-section filters-section" aria-label="Filtros de resultados">
+            <button
+              aria-expanded={filtersOpen}
+              className="collapsible-header"
+              type="button"
+              onClick={() => setFiltersOpen((current) => !current)}
+            >
+              <span className="collapsible-title">
+                <span className="collapse-indicator">{filtersOpen ? "▾" : "▸"}</span>
+                Filtros
+              </span>
+              <span className={activeFilterSummary.count > 0 ? "active-badge" : "active-badge muted"}>
+                {getActiveLabel(activeFilterSummary.count)}
+              </span>
+            </button>
+            {!filtersOpen && activeFilterSummary.count > 0 && (
+              <p className="collapsed-summary">{activeFilterSummary.text}</p>
+            )}
+            {filtersOpen && (
+              <div className="filters-panel">
+                <label className="filter-field filter-field-wide">
               Texto libre
               <input
                 name="text"
@@ -774,21 +880,41 @@ function App() {
               Ocultar centros ya añadidos a mi lista
             </label>
 
-            <button className="download-button" type="button" onClick={clearFilters}>
-              Limpiar filtros
-            </button>
+                <button className="download-button" type="button" onClick={clearFilters}>
+                  Limpiar filtros
+                </button>
+              </div>
+            )}
           </section>
 
-          <section className="scoring-panel" aria-label="Criterios de ordenacion">
-            <div className="scoring-heading">
-              <h3>Criterios de ordenacion</h3>
-              <p>
-                Puntuacion orientativa: distancia hasta 50 puntos, municipio preferido +20,
-                titularidad +15 y nivel educativo +15.
-              </p>
-            </div>
+          <section className="collapsible-section scoring-section" aria-label="Criterios de ordenacion">
+            <button
+              aria-expanded={scoreCriteriaOpen}
+              className="collapsible-header"
+              type="button"
+              onClick={() => setScoreCriteriaOpen((current) => !current)}
+            >
+              <span className="collapsible-title">
+                <span className="collapse-indicator">{scoreCriteriaOpen ? "▾" : "▸"}</span>
+                Criterios de puntuacion
+              </span>
+              <span className={activeScoreSummary.count > 0 ? "active-badge" : "active-badge muted"}>
+                {getActiveLabel(activeScoreSummary.count)}
+              </span>
+            </button>
+            {!scoreCriteriaOpen && activeScoreSummary.count > 0 && (
+              <p className="collapsed-summary">{activeScoreSummary.text}</p>
+            )}
+            {scoreCriteriaOpen && (
+              <div className="scoring-panel">
+                <div className="scoring-heading">
+                  <p>
+                    Puntuacion orientativa: distancia hasta 50 puntos, municipio preferido +20,
+                    titularidad +15 y nivel educativo +15.
+                  </p>
+                </div>
 
-            <label className="score-toggle">
+                <label className="score-toggle">
               <input
                 checked={scoreCriteria.distance}
                 name="distance"
@@ -867,6 +993,8 @@ function App() {
                 ))}
               </select>
             </label>
+              </div>
+            )}
           </section>
 
           <div className="table-wrap">
