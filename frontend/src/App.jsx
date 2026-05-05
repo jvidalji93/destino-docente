@@ -31,7 +31,7 @@ const SORTABLE_COLUMNS = {
   name: "Nombre",
   municipality: "Municipio",
   ownership: "Titularidad",
-  score: "Puntuacion",
+  score: "Puntuación",
 };
 const BASE_CSV_COLUMNS = [
   "id",
@@ -288,6 +288,25 @@ function ConfirmDialog({
   );
 }
 
+function ToastViewport({ toasts, onDismiss }) {
+  if (toasts.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="toast-viewport" aria-live="polite" aria-label="Notificaciones">
+      {toasts.map((toast) => (
+        <div className="toast" key={toast.id}>
+          <span>{toast.message}</span>
+          <button type="button" aria-label="Cerrar notificación" onClick={() => onDismiss(toast.id)}>
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
@@ -295,7 +314,7 @@ function App() {
   const formRef = useRef(DEFAULT_SEARCH);
   const [form, setForm] = useState(DEFAULT_SEARCH);
   const [schools, setSchools] = useState([]);
-  const [status, setStatus] = useState("Introduce una ubicacion y busca centros cercanos.");
+  const [status, setStatus] = useState("Introduce una ubicación y busca centros cercanos.");
   const [isLoading, setIsLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: "distance_km", direction: "asc" });
@@ -306,6 +325,7 @@ function App() {
   const [activeTab, setActiveTab] = useState("search");
   const [addFeedbackCount, setAddFeedbackCount] = useState(0);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [toasts, setToasts] = useState([]);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
   const [myList, setMyList] = useState(loadStoredMyList);
   const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
@@ -493,6 +513,20 @@ function App() {
   }, [myList]);
 
   useEffect(() => {
+    if (toasts.length === 0) {
+      return undefined;
+    }
+
+    const timers = toasts.map((toast) =>
+      window.setTimeout(() => {
+        setToasts((current) => current.filter((currentToast) => currentToast.id !== toast.id));
+      }, 3500),
+    );
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [toasts]);
+
+  useEffect(() => {
     const radiusKm = Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km);
 
     setFilters((current) => {
@@ -560,7 +594,7 @@ function App() {
       fillOpacity: 0.95,
       weight: 3,
     })
-      .bindPopup("Punto de busqueda")
+      .bindPopup("Punto de búsqueda")
       .addTo(layer);
 
     sortedSchools.forEach((school) => {
@@ -707,6 +741,15 @@ function App() {
     return currentSortConfig.direction === "asc" ? "ascending" : "descending";
   }
 
+  function showToast(message) {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((current) => [...current, { id, message }]);
+  }
+
+  function dismissToast(toastId) {
+    setToasts((current) => current.filter((toast) => toast.id !== toastId));
+  }
+
   function downloadCsv(rowsToDownload, filename, extraColumns = []) {
     if (rowsToDownload.length === 0) {
       return;
@@ -729,6 +772,7 @@ function App() {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+    showToast("CSV descargado.");
   }
 
   function toggleSchoolSelection(schoolId) {
@@ -766,6 +810,11 @@ function App() {
       ];
     });
     setAddFeedbackCount(addedCount);
+    showToast(
+      addedCount === 1
+        ? "Se ha añadido 1 centro a Mi lista."
+        : `Se han añadido ${addedCount} centros a Mi lista.`,
+    );
     setSelectedSchoolIds(new Set());
   }
 
@@ -787,6 +836,7 @@ function App() {
       variant: "danger",
       onConfirm: () => {
         setMyList((current) => current.filter((school) => school.id !== schoolId));
+        showToast("Centro eliminado de Mi lista.");
       },
     });
   }
@@ -825,30 +875,31 @@ function App() {
       variant: "danger",
       onConfirm: () => {
         setMyList([]);
+        showToast("Mi lista se ha vaciado.");
       },
     });
   }
 
   function getLocationErrorMessage(error) {
     if (error.code === error.PERMISSION_DENIED) {
-      return "No se pudo usar tu ubicacion porque el permiso fue denegado. Puedes introducir latitud y longitud manualmente.";
+      return "No se pudo usar tu ubicación porque el permiso fue denegado. Puedes introducir latitud y longitud manualmente.";
     }
 
     if (error.code === error.TIMEOUT) {
-      return "No se pudo obtener tu ubicacion a tiempo. Puedes introducir latitud y longitud manualmente.";
+      return "No se pudo obtener tu ubicación a tiempo. Puedes introducir latitud y longitud manualmente.";
     }
 
-    return "No se pudo obtener tu ubicacion. Puedes introducir latitud y longitud manualmente.";
+    return "No se pudo obtener tu ubicación. Puedes introducir latitud y longitud manualmente.";
   }
 
   function useCurrentLocation() {
     if (!navigator.geolocation) {
-      setStatus("Tu navegador no soporta geolocalizacion. Puedes introducir latitud y longitud manualmente.");
+      setStatus("Tu navegador no soporta geolocalización. Puedes introducir latitud y longitud manualmente.");
       return;
     }
 
     setIsLocating(true);
-    setStatus("Obteniendo tu ubicacion...");
+    setStatus("Obteniendo tu ubicación...");
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -876,7 +927,7 @@ function App() {
 
   return (
     <main className={`app-shell active-tab-${activeTab}`}>
-      <nav className="tab-nav" aria-label="Navegacion principal">
+      <nav className="tab-nav" aria-label="Navegación principal">
         <button
           aria-selected={activeTab === "search"}
           className={activeTab === "search" ? "tab-button active" : "tab-button"}
@@ -897,12 +948,13 @@ function App() {
         </button>
       </nav>
 
-      <section className="toolbar" aria-label="Busqueda de centros">
+      <section className="toolbar" aria-label="Búsqueda de centros">
         <div>
-          <h1>Destino Docente</h1>
+          <span className="section-kicker">Destino Docente</span>
+          <h1>Buscar centros</h1>
           <p>Centros educativos cercanos</p>
           <p className="help-text">
-            Haz clic en el mapa o usa tu ubicacion actual para elegir el punto de busqueda.
+            Haz clic en el mapa o usa tu ubicación actual para elegir el punto de búsqueda.
           </p>
         </div>
 
@@ -1019,7 +1071,7 @@ function App() {
               Texto libre
               <input
                 name="text"
-                placeholder="Nombre, direccion, municipio o provincia"
+                placeholder="Nombre, dirección, municipio o provincia"
                 type="search"
                 value={filters.text}
                 onChange={updateFilter}
@@ -1104,7 +1156,7 @@ function App() {
             )}
           </section>
 
-          <section className="collapsible-section scoring-section" aria-label="Criterios de ordenacion">
+          <section className="collapsible-section scoring-section" aria-label="Criterios de ordenación">
             <button
               aria-expanded={scoreCriteriaOpen}
               className="collapsible-header"
@@ -1113,7 +1165,7 @@ function App() {
             >
               <span className="collapsible-title">
                 <span className="collapse-indicator">{scoreCriteriaOpen ? "▾" : "▸"}</span>
-                Criterios de puntuacion
+                Criterios de puntuación
               </span>
               <span className={activeScoreSummary.count > 0 ? "active-badge" : "active-badge muted"}>
                 {getActiveLabel(activeScoreSummary.count)}
@@ -1126,7 +1178,7 @@ function App() {
               <div className="scoring-panel">
                 <div className="scoring-heading">
                   <p>
-                    Puntuacion orientativa: distancia hasta 50 puntos, municipio preferido +20,
+                    Puntuación orientativa: distancia hasta 50 puntos, municipio preferido +20,
                     titularidad +15 y nivel educativo +15.
                   </p>
                 </div>
@@ -1154,7 +1206,7 @@ function App() {
               <input
                 disabled={!scoreCriteria.municipality}
                 name="preferredMunicipalities"
-                placeholder="Madrid, Getafe, Leganes"
+                placeholder="Madrid, Getafe, Leganés"
                 type="text"
                 value={scoreCriteria.preferredMunicipalities}
                 onChange={updateScoreCriteria}
@@ -1315,7 +1367,7 @@ function App() {
                         <input
                           aria-label={
                             isInMyList
-                              ? `${school.name} ya esta en mi lista`
+                              ? `${school.name} ya está en mi lista`
                               : `Seleccionar ${school.name}`
                           }
                           checked={!isInMyList && selectedSchoolIds.has(school.id)}
@@ -1341,7 +1393,7 @@ function App() {
                 {sortedSchools.length === 0 && (
                   <tr>
                     <td colSpan="7" className="empty-state">
-                      No hay centros que coincidan con los filtros actuales.
+                      No hay centros visibles. Ajusta los filtros o realiza una nueva búsqueda.
                     </td>
                   </tr>
                 )}
@@ -1376,8 +1428,13 @@ function App() {
             </div>
 
             <div className="my-list-summary" aria-label="Resumen de mi lista">
+              <div className="summary-heading">
+                <h3>Resumen de Mi lista</h3>
+              </div>
               {myListSummary.total === 0 ? (
-                <p className="my-list-empty-summary">Mi lista esta vacia. Añade centros para ver el resumen.</p>
+                <p className="my-list-empty-summary">
+                  Mi lista está vacía. Añade centros para ver el resumen.
+                </p>
               ) : (
                 <div className="summary-grid">
                   <div className="summary-item">
@@ -1456,7 +1513,7 @@ function App() {
                     </th>
                     <th>Notas</th>
                     <th>Orden</th>
-                    <th>Accion</th>
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1514,7 +1571,7 @@ function App() {
                   {sortedMyList.length === 0 && (
                     <tr>
                       <td colSpan="9" className="empty-state">
-                        Selecciona centros de los resultados y a??delos a tu lista.
+                        Tu lista está vacía. Añade centros desde la pestaña Buscar centros para compararlos aquí.
                       </td>
                     </tr>
                   )}
@@ -1537,6 +1594,7 @@ function App() {
           setConfirmDialog(null);
         }}
       />
+      <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }

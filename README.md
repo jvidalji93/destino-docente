@@ -151,7 +151,7 @@ http://127.0.0.1:5173
 5. El backend esta arrancado en `http://127.0.0.1:8000`.
 6. El frontend esta arrancado en `http://127.0.0.1:5173`.
 7. Abre el frontend en el navegador.
-8. Usa los valores por defecto de Madrid o pulsa `Usar mi ubicacion`.
+8. Usa los valores por defecto de Madrid o pulsa `Usar mi ubicación`.
 9. Pulsa `Buscar`.
 
 Deberias ver centros educativos como puntos en el mapa y tambien en la tabla. La tabla permite ordenar resultados y descargar el CSV de los resultados visibles.
@@ -253,5 +253,5 @@ deactivate
 ## Notas
 
 - No subas `.env` al repositorio.
-- No hay login ni busqueda por direccion todavia.
+- No hay login ni búsqueda por dirección todavía.
 - El frontend solo llama al backend local en `http://127.0.0.1:8000`.
