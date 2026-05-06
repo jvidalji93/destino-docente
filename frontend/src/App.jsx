@@ -26,6 +26,8 @@ const DEFAULT_SCORE_CRITERIA = {
   preferredEducationLevel: "",
 };
 const MY_LIST_STORAGE_KEY = "destino-docente.my-list";
+const PREFERENCES_STORAGE_KEY = "destino-docente.preferences";
+const DEFAULT_LOCATION_STORAGE_KEY = "destino-docente-default-location";
 const SORTABLE_COLUMNS = {
   distance_km: "Distancia km",
   name: "Nombre",
@@ -288,6 +290,104 @@ function ConfirmDialog({
   );
 }
 
+function normalizeStoredPreferences(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const filters = value.filters && typeof value.filters === "object" ? value.filters : {};
+  const scoreCriteria = value.scoreCriteria && typeof value.scoreCriteria === "object" ? value.scoreCriteria : {};
+
+  return {
+    radius_km: String(value.radius_km ?? DEFAULT_SEARCH.radius_km),
+    filters: {
+      ...DEFAULT_FILTERS,
+      ...filters,
+      hideListed: Boolean(filters.hideListed ?? DEFAULT_FILTERS.hideListed),
+    },
+    scoreCriteria: {
+      ...DEFAULT_SCORE_CRITERIA,
+      ...scoreCriteria,
+      distance: Boolean(scoreCriteria.distance ?? DEFAULT_SCORE_CRITERIA.distance),
+      municipality: Boolean(scoreCriteria.municipality ?? DEFAULT_SCORE_CRITERIA.municipality),
+      ownership: Boolean(scoreCriteria.ownership ?? DEFAULT_SCORE_CRITERIA.ownership),
+      educationLevel: Boolean(scoreCriteria.educationLevel ?? DEFAULT_SCORE_CRITERIA.educationLevel),
+    },
+  };
+}
+
+function loadStoredPreferences() {
+  try {
+    const storedValue = window.localStorage.getItem(PREFERENCES_STORAGE_KEY);
+    if (!storedValue) {
+      return null;
+    }
+
+    return normalizeStoredPreferences(JSON.parse(storedValue));
+  } catch (error) {
+    return null;
+  }
+}
+
+function hasValidCoordinates(latitude, longitude) {
+  const numericLatitude = Number(latitude);
+  const numericLongitude = Number(longitude);
+
+  return (
+    Number.isFinite(numericLatitude) &&
+    Number.isFinite(numericLongitude) &&
+    numericLatitude >= -90 &&
+    numericLatitude <= 90 &&
+    numericLongitude >= -180 &&
+    numericLongitude <= 180
+  );
+}
+
+function normalizeStoredDefaultLocation(value) {
+  if (!value || typeof value !== "object" || !hasValidCoordinates(value.latitude, value.longitude)) {
+    return null;
+  }
+
+  return {
+    latitude: String(value.latitude),
+    longitude: String(value.longitude),
+    label: String(value.label || "Ubicación predeterminada"),
+  };
+}
+
+function loadStoredDefaultLocation() {
+  try {
+    const storedValue = window.localStorage.getItem(DEFAULT_LOCATION_STORAGE_KEY);
+    if (!storedValue) {
+      return null;
+    }
+
+    return normalizeStoredDefaultLocation(JSON.parse(storedValue));
+  } catch (error) {
+    return null;
+  }
+}
+
+function getInitialForm() {
+  const storedPreferences = loadStoredPreferences();
+  const storedDefaultLocation = loadStoredDefaultLocation();
+
+  return {
+    ...DEFAULT_SEARCH,
+    lat: storedDefaultLocation?.latitude ?? DEFAULT_SEARCH.lat,
+    lng: storedDefaultLocation?.longitude ?? DEFAULT_SEARCH.lng,
+    radius_km: storedPreferences?.radius_km ?? DEFAULT_SEARCH.radius_km,
+  };
+}
+
+function getInitialFilters() {
+  return loadStoredPreferences()?.filters ?? DEFAULT_FILTERS;
+}
+
+function getInitialScoreCriteria() {
+  return loadStoredPreferences()?.scoreCriteria ?? DEFAULT_SCORE_CRITERIA;
+}
+
 function ToastViewport({ toasts, onDismiss }) {
   if (toasts.length === 0) {
     return null;
@@ -311,21 +411,23 @@ function App() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
-  const formRef = useRef(DEFAULT_SEARCH);
-  const [form, setForm] = useState(DEFAULT_SEARCH);
+  const [form, setForm] = useState(getInitialForm);
+  const formRef = useRef(form);
+  const didRunDefaultLocationSearchRef = useRef(false);
   const [schools, setSchools] = useState([]);
   const [status, setStatus] = useState("Introduce una ubicación y busca centros cercanos.");
   const [isLoading, setIsLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: "distance_km", direction: "asc" });
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [scoreCriteria, setScoreCriteria] = useState(DEFAULT_SCORE_CRITERIA);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [scoreCriteriaOpen, setScoreCriteriaOpen] = useState(false);
+  const [filters, setFilters] = useState(getInitialFilters);
+  const [scoreCriteria, setScoreCriteria] = useState(getInitialScoreCriteria);
+  const [activeDrawer, setActiveDrawer] = useState(null);
   const [activeTab, setActiveTab] = useState("search");
   const [addFeedbackCount, setAddFeedbackCount] = useState(0);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [storedPreferences, setStoredPreferences] = useState(loadStoredPreferences);
+  const [storedDefaultLocation, setStoredDefaultLocation] = useState(loadStoredDefaultLocation);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
   const [myList, setMyList] = useState(loadStoredMyList);
   const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
@@ -503,6 +605,98 @@ function App() {
       text: activeCriteria.join(" · "),
     };
   }, [scoreCriteria]);
+  const storedPreferencesAvailable = Boolean(storedPreferences);
+  const defaultLocationAvailable = Boolean(storedDefaultLocation);
+  const storedPreferencesCount = Number(storedPreferencesAvailable) + Number(defaultLocationAvailable);
+  const storedPreferencesBadge =
+    storedPreferencesCount === 1 ? "1 guardada" : `${storedPreferencesCount} guardadas`;
+  const storedPreferencesHeaderSummary = useMemo(() => {
+    if (storedPreferencesAvailable && defaultLocationAvailable) {
+      return "Ubicación + filtros guardados";
+    }
+
+    if (defaultLocationAvailable) {
+      return "Solo ubicación guardada";
+    }
+
+    if (storedPreferencesAvailable) {
+      return "Solo filtros guardados";
+    }
+
+    return "";
+  }, [defaultLocationAvailable, storedPreferencesAvailable]);
+  const storedSearchPreferencesSummary = useMemo(() => {
+    if (!storedPreferences) {
+      return [];
+    }
+
+    const summary = [`Radio: ${storedPreferences.radius_km} km`];
+    const savedFilters = storedPreferences.filters;
+    const savedScoreCriteria = storedPreferences.scoreCriteria;
+    const activeSavedScoreCriteria = [];
+
+    if (savedFilters.text.trim()) {
+      summary.push(`Texto: ${truncateSummaryValue(savedFilters.text)}`);
+    }
+
+    if (savedFilters.province) {
+      summary.push(`Provincia: ${savedFilters.province}`);
+    }
+
+    if (savedFilters.municipality) {
+      summary.push(`Municipio: ${savedFilters.municipality}`);
+    }
+
+    if (savedFilters.ownership) {
+      summary.push(`Titularidad: ${savedFilters.ownership}`);
+    }
+
+    if (savedFilters.educationLevel) {
+      summary.push(`Nivel: ${savedFilters.educationLevel}`);
+    }
+
+    if (savedFilters.maxDistanceKm) {
+      summary.push(`Distancia max.: ${savedFilters.maxDistanceKm} km`);
+    }
+
+    if (savedFilters.hideListed) {
+      summary.push("Oculta centros ya añadidos");
+    }
+
+    if (savedScoreCriteria.distance) {
+      activeSavedScoreCriteria.push("distancia");
+    }
+
+    if (savedScoreCriteria.municipality) {
+      activeSavedScoreCriteria.push(
+        savedScoreCriteria.preferredMunicipalities.trim()
+          ? `municipio preferido (${savedScoreCriteria.preferredMunicipalities})`
+          : "municipio preferido",
+      );
+    }
+
+    if (savedScoreCriteria.ownership) {
+      activeSavedScoreCriteria.push(
+        savedScoreCriteria.preferredOwnership
+          ? `titularidad (${savedScoreCriteria.preferredOwnership})`
+          : "titularidad",
+      );
+    }
+
+    if (savedScoreCriteria.educationLevel) {
+      activeSavedScoreCriteria.push(
+        savedScoreCriteria.preferredEducationLevel
+          ? `nivel (${savedScoreCriteria.preferredEducationLevel})`
+          : "nivel",
+      );
+    }
+
+    if (activeSavedScoreCriteria.length > 0) {
+      summary.push(`Criterios: ${activeSavedScoreCriteria.join(", ")}`);
+    }
+
+    return summary;
+  }, [storedPreferences]);
 
   useEffect(() => {
     formRef.current = form;
@@ -525,6 +719,21 @@ function App() {
 
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [toasts]);
+
+  useEffect(() => {
+    if (!activeDrawer) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setActiveDrawer(null);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [activeDrawer]);
 
   useEffect(() => {
     const radiusKm = Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km);
@@ -616,6 +825,28 @@ function App() {
     });
   }, [center, form.radius_km, myListIds, sortedSchools]);
 
+  useEffect(() => {
+    if (didRunDefaultLocationSearchRef.current) {
+      return;
+    }
+
+    const storedDefaultLocation = loadStoredDefaultLocation();
+    if (!storedDefaultLocation) {
+      return;
+    }
+
+    didRunDefaultLocationSearchRef.current = true;
+    const nextForm = {
+      ...formRef.current,
+      lat: storedDefaultLocation.latitude,
+      lng: storedDefaultLocation.longitude,
+    };
+
+    setForm(nextForm);
+    formRef.current = nextForm;
+    runSearch(nextForm);
+  }, []);
+
   function updateForm(event) {
     const { name, value } = event.target;
     setForm((current) => {
@@ -662,11 +893,115 @@ function App() {
     setFilters(DEFAULT_FILTERS);
   }
 
+  function resetScoreCriteria() {
+    setScoreCriteria(DEFAULT_SCORE_CRITERIA);
+  }
+
   function clearFilter(filterKey) {
     setFilters((current) => ({
       ...current,
       [filterKey]: typeof current[filterKey] === "boolean" ? false : "",
     }));
+  }
+
+  function getCurrentPreferences() {
+    return {
+      radius_km: form.radius_km,
+      filters,
+      scoreCriteria,
+    };
+  }
+
+  function applyPreferences(preferences) {
+    const normalizedPreferences = normalizeStoredPreferences(preferences);
+
+    if (!normalizedPreferences) {
+      return;
+    }
+
+    setForm((current) => {
+      const nextForm = {
+        ...current,
+        radius_km: normalizedPreferences.radius_km,
+      };
+      formRef.current = nextForm;
+      return nextForm;
+    });
+    setFilters(normalizedPreferences.filters);
+    setScoreCriteria(normalizedPreferences.scoreCriteria);
+  }
+
+  function savePreferences() {
+    const nextPreferences = getCurrentPreferences();
+    window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(nextPreferences));
+    setStoredPreferences(normalizeStoredPreferences(nextPreferences));
+    showToast("Preferencias guardadas");
+  }
+
+  function restorePreferences() {
+    const storedPreferences = loadStoredPreferences();
+
+    if (!storedPreferences) {
+      setStoredPreferences(null);
+      showToast("No hay preferencias guardadas");
+      return;
+    }
+
+    applyPreferences(storedPreferences);
+    setStoredPreferences(storedPreferences);
+    showToast("Preferencias restauradas");
+  }
+
+  function deletePreferences() {
+    window.localStorage.removeItem(PREFERENCES_STORAGE_KEY);
+    setStoredPreferences(null);
+    showToast("Preferencias borradas");
+  }
+
+  function saveDefaultLocation() {
+    if (!hasValidCoordinates(form.lat, form.lng)) {
+      showToast("Selecciona primero una ubicación en el mapa o usa tu ubicación actual");
+      return;
+    }
+
+    window.localStorage.setItem(
+      DEFAULT_LOCATION_STORAGE_KEY,
+      JSON.stringify({
+        latitude: Number(form.lat),
+        longitude: Number(form.lng),
+        label: "Ubicación predeterminada",
+      }),
+    );
+    setStoredDefaultLocation(loadStoredDefaultLocation());
+    showToast("Ubicación predeterminada guardada");
+  }
+
+  function useDefaultLocation() {
+    const storedDefaultLocation = loadStoredDefaultLocation();
+
+    if (!storedDefaultLocation) {
+      setStoredDefaultLocation(null);
+      return;
+    }
+
+    const nextForm = {
+      ...form,
+      lat: storedDefaultLocation.latitude,
+      lng: storedDefaultLocation.longitude,
+    };
+
+    setForm(nextForm);
+    formRef.current = nextForm;
+    runSearch(nextForm);
+    setStoredDefaultLocation(storedDefaultLocation);
+    setActiveDrawer(null);
+    showToast("Ubicación predeterminada aplicada");
+  }
+
+  function deleteDefaultLocation() {
+    window.localStorage.removeItem(DEFAULT_LOCATION_STORAGE_KEY);
+    setStoredDefaultLocation(null);
+    showToast("Ubicación predeterminada borrada");
   }
 
   async function runSearch(searchValues) {
@@ -984,6 +1319,39 @@ function App() {
             >
               {isLocating ? "Ubicando" : "Usar mi ubicación"}
             </button>
+            <button
+              className="secondary-button preferences-trigger"
+              type="button"
+              onClick={() => setActiveDrawer("filters")}
+            >
+              Filtros
+              {activeFilterSummary.count > 0 && (
+                <span className="preferences-trigger-badge">{activeFilterSummary.count}</span>
+              )}
+            </button>
+            <button
+              className="secondary-button preferences-trigger"
+              type="button"
+              onClick={() => setActiveDrawer("scoring")}
+            >
+              Criterios
+              {activeScoreSummary.count > 0 && (
+                <span className="preferences-trigger-badge">{activeScoreSummary.count}</span>
+              )}
+            </button>
+            <button
+              className="secondary-button preferences-trigger"
+              type="button"
+              onClick={() => setActiveDrawer("preferences")}
+            >
+              <span aria-hidden="true" className="preferences-trigger-icon">
+                ⚙
+              </span>
+              Preferencias
+              {storedPreferencesCount > 0 && (
+                <span className="preferences-trigger-badge">{storedPreferencesCount}</span>
+              )}
+            </button>
           </div>
           <details className="advanced-controls">
             <summary>Coordenadas avanzadas</summary>
@@ -1046,225 +1414,6 @@ function App() {
               Añadir a mi lista
             </button>
           </div>
-
-          <section className="collapsible-section filters-section" aria-label="Filtros de resultados">
-            <button
-              aria-expanded={filtersOpen}
-              className="collapsible-header"
-              type="button"
-              onClick={() => setFiltersOpen((current) => !current)}
-            >
-              <span className="collapsible-title">
-                <span className="collapse-indicator">{filtersOpen ? "▾" : "▸"}</span>
-                Filtros
-              </span>
-              <span className={activeFilterSummary.count > 0 ? "active-badge" : "active-badge muted"}>
-                {getActiveLabel(activeFilterSummary.count)}
-              </span>
-            </button>
-            {!filtersOpen && activeFilterSummary.count > 0 && (
-              <p className="collapsed-summary">{activeFilterSummary.text}</p>
-            )}
-            {filtersOpen && (
-              <div className="filters-panel">
-                <label className="filter-field filter-field-wide">
-              Texto libre
-              <input
-                name="text"
-                placeholder="Nombre, dirección, municipio o provincia"
-                type="search"
-                value={filters.text}
-                onChange={updateFilter}
-              />
-            </label>
-
-            <label className="filter-field">
-              Provincia
-              <select name="province" value={filters.province} onChange={updateFilter}>
-                <option value="">Todas</option>
-                {provinceOptions.map((province) => (
-                  <option key={province} value={province}>
-                    {province}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="filter-field">
-              Municipio
-              <select name="municipality" value={filters.municipality} onChange={updateFilter}>
-                <option value="">Todos</option>
-                {municipalityOptions.map((municipality) => (
-                  <option key={municipality} value={municipality}>
-                    {municipality}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="filter-field">
-              Titularidad
-              <select name="ownership" value={filters.ownership} onChange={updateFilter}>
-                <option value="">Todas</option>
-                {ownershipOptions.map((ownership) => (
-                  <option key={ownership} value={ownership}>
-                    {ownership}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="filter-field">
-              Nivel educativo
-              <select name="educationLevel" value={filters.educationLevel} onChange={updateFilter}>
-                <option value="">Todos</option>
-                {educationLevelOptions.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="filter-field">
-              Distancia max. km
-              <input
-                max={Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km)}
-                min="0"
-                name="maxDistanceKm"
-                step="0.1"
-                type="number"
-                value={filters.maxDistanceKm}
-                onChange={updateFilter}
-              />
-            </label>
-
-            <label className="filter-check">
-              <input
-                checked={filters.hideListed}
-                name="hideListed"
-                type="checkbox"
-                onChange={updateFilter}
-              />
-              Ocultar centros ya añadidos a mi lista
-            </label>
-
-                <button className="download-button" type="button" onClick={clearFilters}>
-                  Limpiar filtros
-                </button>
-              </div>
-            )}
-          </section>
-
-          <section className="collapsible-section scoring-section" aria-label="Criterios de ordenación">
-            <button
-              aria-expanded={scoreCriteriaOpen}
-              className="collapsible-header"
-              type="button"
-              onClick={() => setScoreCriteriaOpen((current) => !current)}
-            >
-              <span className="collapsible-title">
-                <span className="collapse-indicator">{scoreCriteriaOpen ? "▾" : "▸"}</span>
-                Criterios de puntuación
-              </span>
-              <span className={activeScoreSummary.count > 0 ? "active-badge" : "active-badge muted"}>
-                {getActiveLabel(activeScoreSummary.count)}
-              </span>
-            </button>
-            {!scoreCriteriaOpen && activeScoreSummary.count > 0 && (
-              <p className="collapsed-summary">{activeScoreSummary.text}</p>
-            )}
-            {scoreCriteriaOpen && (
-              <div className="scoring-panel">
-                <div className="scoring-heading">
-                  <p>
-                    Puntuación orientativa: distancia hasta 50 puntos, municipio preferido +20,
-                    titularidad +15 y nivel educativo +15.
-                  </p>
-                </div>
-
-                <label className="score-toggle">
-              <input
-                checked={scoreCriteria.distance}
-                name="distance"
-                type="checkbox"
-                onChange={updateScoreCriteria}
-              />
-              Menor distancia
-            </label>
-
-            <label className="score-field score-field-wide">
-              <span>
-                <input
-                  checked={scoreCriteria.municipality}
-                  name="municipality"
-                  type="checkbox"
-                  onChange={updateScoreCriteria}
-                />
-                Municipio preferido
-              </span>
-              <input
-                disabled={!scoreCriteria.municipality}
-                name="preferredMunicipalities"
-                placeholder="Madrid, Getafe, Leganés"
-                type="text"
-                value={scoreCriteria.preferredMunicipalities}
-                onChange={updateScoreCriteria}
-              />
-            </label>
-
-            <label className="score-field">
-              <span>
-                <input
-                  checked={scoreCriteria.ownership}
-                  name="ownership"
-                  type="checkbox"
-                  onChange={updateScoreCriteria}
-                />
-                Titularidad preferida
-              </span>
-              <select
-                disabled={!scoreCriteria.ownership}
-                name="preferredOwnership"
-                value={scoreCriteria.preferredOwnership}
-                onChange={updateScoreCriteria}
-              >
-                <option value="">Selecciona</option>
-                {ownershipOptions.map((ownership) => (
-                  <option key={ownership} value={ownership}>
-                    {ownership}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>
-                <input
-                  checked={scoreCriteria.educationLevel}
-                  name="educationLevel"
-                  type="checkbox"
-                  onChange={updateScoreCriteria}
-                />
-                Nivel preferido
-              </span>
-              <select
-                disabled={!scoreCriteria.educationLevel}
-                name="preferredEducationLevel"
-                value={scoreCriteria.preferredEducationLevel}
-                onChange={updateScoreCriteria}
-              >
-                <option value="">Selecciona</option>
-                {educationLevelOptions.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
-                ))}
-              </select>
-            </label>
-              </div>
-            )}
-          </section>
 
           {activeFilterChips.length > 0 && (
             <section className="active-filters-row" aria-label="Filtros activos">
@@ -1581,6 +1730,357 @@ function App() {
           </section>
         </div>
       </section>
+      {activeDrawer === "filters" && (
+        <div className="drawer-backdrop" role="presentation">
+          <aside
+            aria-labelledby="filters-drawer-title"
+            aria-modal="true"
+            className="preferences-drawer"
+            role="dialog"
+          >
+            <div className="drawer-header">
+              <div>
+                <h2 id="filters-drawer-title">Filtros</h2>
+                <p>{activeFilterSummary.text || "Ajusta los resultados visibles en tabla y mapa"}</p>
+              </div>
+              <button
+                className="drawer-close-button"
+                type="button"
+                aria-label="Cerrar filtros"
+                onClick={() => setActiveDrawer(null)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="drawer-status">
+              <span className={activeFilterSummary.count > 0 ? "active-badge" : "active-badge muted"}>
+                {getActiveLabel(activeFilterSummary.count)}
+              </span>
+            </div>
+
+            <div className="filters-panel">
+              <label className="filter-field filter-field-wide">
+                Texto libre
+                <input
+                  name="text"
+                  placeholder="Nombre, dirección, municipio o provincia"
+                  type="search"
+                  value={filters.text}
+                  onChange={updateFilter}
+                />
+              </label>
+
+              <label className="filter-field">
+                Provincia
+                <select name="province" value={filters.province} onChange={updateFilter}>
+                  <option value="">Todas</option>
+                  {provinceOptions.map((province) => (
+                    <option key={province} value={province}>
+                      {province}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="filter-field">
+                Municipio
+                <select name="municipality" value={filters.municipality} onChange={updateFilter}>
+                  <option value="">Todos</option>
+                  {municipalityOptions.map((municipality) => (
+                    <option key={municipality} value={municipality}>
+                      {municipality}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="filter-field">
+                Titularidad
+                <select name="ownership" value={filters.ownership} onChange={updateFilter}>
+                  <option value="">Todas</option>
+                  {ownershipOptions.map((ownership) => (
+                    <option key={ownership} value={ownership}>
+                      {ownership}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="filter-field">
+                Nivel educativo
+                <select name="educationLevel" value={filters.educationLevel} onChange={updateFilter}>
+                  <option value="">Todos</option>
+                  {educationLevelOptions.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="filter-field">
+                Distancia max. km
+                <input
+                  max={Number(form.radius_km) || Number(DEFAULT_SEARCH.radius_km)}
+                  min="0"
+                  name="maxDistanceKm"
+                  step="0.1"
+                  type="number"
+                  value={filters.maxDistanceKm}
+                  onChange={updateFilter}
+                />
+              </label>
+
+              <label className="filter-check">
+                <input
+                  checked={filters.hideListed}
+                  name="hideListed"
+                  type="checkbox"
+                  onChange={updateFilter}
+                />
+                Ocultar centros ya añadidos a mi lista
+              </label>
+
+              <button className="download-button" type="button" onClick={clearFilters}>
+                Limpiar filtros
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {activeDrawer === "scoring" && (
+        <div className="drawer-backdrop" role="presentation">
+          <aside
+            aria-labelledby="scoring-drawer-title"
+            aria-modal="true"
+            className="preferences-drawer"
+            role="dialog"
+          >
+            <div className="drawer-header">
+              <div>
+                <h2 id="scoring-drawer-title">Criterios de puntuación</h2>
+                <p>
+                  Puntuación orientativa: distancia hasta 50 puntos, municipio preferido +20,
+                  titularidad +15 y nivel educativo +15.
+                </p>
+              </div>
+              <button
+                className="drawer-close-button"
+                type="button"
+                aria-label="Cerrar criterios"
+                onClick={() => setActiveDrawer(null)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="drawer-status">
+              <span className={activeScoreSummary.count > 0 ? "active-badge" : "active-badge muted"}>
+                {getActiveLabel(activeScoreSummary.count)}
+              </span>
+            </div>
+
+            <div className="scoring-panel">
+              <label className="score-toggle">
+                <input
+                  checked={scoreCriteria.distance}
+                  name="distance"
+                  type="checkbox"
+                  onChange={updateScoreCriteria}
+                />
+                Menor distancia
+              </label>
+
+              <label className="score-field score-field-wide">
+                <span>
+                  <input
+                    checked={scoreCriteria.municipality}
+                    name="municipality"
+                    type="checkbox"
+                    onChange={updateScoreCriteria}
+                  />
+                  Municipio preferido
+                </span>
+                <input
+                  disabled={!scoreCriteria.municipality}
+                  name="preferredMunicipalities"
+                  placeholder="Madrid, Getafe, Leganés"
+                  type="text"
+                  value={scoreCriteria.preferredMunicipalities}
+                  onChange={updateScoreCriteria}
+                />
+              </label>
+
+              <label className="score-field">
+                <span>
+                  <input
+                    checked={scoreCriteria.ownership}
+                    name="ownership"
+                    type="checkbox"
+                    onChange={updateScoreCriteria}
+                  />
+                  Titularidad preferida
+                </span>
+                <select
+                  disabled={!scoreCriteria.ownership}
+                  name="preferredOwnership"
+                  value={scoreCriteria.preferredOwnership}
+                  onChange={updateScoreCriteria}
+                >
+                  <option value="">Selecciona</option>
+                  {ownershipOptions.map((ownership) => (
+                    <option key={ownership} value={ownership}>
+                      {ownership}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="score-field">
+                <span>
+                  <input
+                    checked={scoreCriteria.educationLevel}
+                    name="educationLevel"
+                    type="checkbox"
+                    onChange={updateScoreCriteria}
+                  />
+                  Nivel preferido
+                </span>
+                <select
+                  disabled={!scoreCriteria.educationLevel}
+                  name="preferredEducationLevel"
+                  value={scoreCriteria.preferredEducationLevel}
+                  onChange={updateScoreCriteria}
+                >
+                  <option value="">Selecciona</option>
+                  {educationLevelOptions.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button className="download-button" type="button" onClick={resetScoreCriteria}>
+                Restablecer criterios
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {activeDrawer === "preferences" && (
+        <div className="drawer-backdrop" role="presentation">
+          <aside
+            aria-labelledby="preferences-drawer-title"
+            aria-modal="true"
+            className="preferences-drawer"
+            role="dialog"
+          >
+            <div className="drawer-header">
+              <div>
+                <h2 id="preferences-drawer-title">Mis preferencias</h2>
+                <p>
+                  {storedPreferencesHeaderSummary || "Gestiona tu ubicación y preferencias guardadas"}
+                </p>
+              </div>
+              <button
+                className="drawer-close-button"
+                type="button"
+                aria-label="Cerrar preferencias"
+                onClick={() => setActiveDrawer(null)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="drawer-status">
+              <span className={storedPreferencesCount > 0 ? "active-badge" : "active-badge muted"}>
+                {storedPreferencesBadge}
+              </span>
+            </div>
+
+            <div className="preferences-panel">
+              <section className="preference-block" aria-label="Ubicación predeterminada guardada">
+                <div className="preference-block-header">
+                  <h3>Ubicación predeterminada</h3>
+                </div>
+                {storedDefaultLocation ? (
+                  <div className="preference-details">
+                    <p>
+                      <strong>{storedDefaultLocation.label}</strong>
+                    </p>
+                    <dl>
+                      <div>
+                        <dt>Latitud</dt>
+                        <dd>{storedDefaultLocation.latitude}</dd>
+                      </div>
+                      <div>
+                        <dt>Longitud</dt>
+                        <dd>{storedDefaultLocation.longitude}</dd>
+                      </div>
+                    </dl>
+                    <div className="preference-actions">
+                      <button className="download-button" type="button" onClick={useDefaultLocation}>
+                        Usar ubicación
+                      </button>
+                      <button className="download-button danger-action" type="button" onClick={deleteDefaultLocation}>
+                        Borrar ubicación
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="preference-details">
+                    <p>No hay ubicación predeterminada guardada</p>
+                  </div>
+                )}
+                {hasValidCoordinates(form.lat, form.lng) && (
+                  <div className="preference-actions">
+                    <button className="download-button" type="button" onClick={saveDefaultLocation}>
+                      Guardar ubicación actual como predeterminada
+                    </button>
+                  </div>
+                )}
+              </section>
+
+              <section className="preference-block" aria-label="Preferencias de búsqueda guardadas">
+                <div className="preference-block-header">
+                  <h3>Preferencias de búsqueda</h3>
+                </div>
+                {storedPreferences ? (
+                  <div className="preference-details">
+                    <ul className="preference-summary-list">
+                      {storedSearchPreferencesSummary.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="preference-empty">No hay preferencias de búsqueda guardadas</p>
+                )}
+                <div className="preference-actions">
+                  <button className="download-button" type="button" onClick={savePreferences}>
+                    Guardar preferencias actuales
+                  </button>
+                  <button className="download-button" type="button" onClick={restorePreferences}>
+                    Restaurar preferencias
+                  </button>
+                  <button
+                    className="download-button danger-action"
+                    type="button"
+                    disabled={!storedPreferencesAvailable}
+                    onClick={deletePreferences}
+                  >
+                    Borrar preferencias
+                  </button>
+                </div>
+              </section>
+            </div>
+          </aside>
+        </div>
+      )}
       <ConfirmDialog
         isOpen={Boolean(confirmDialog)}
         title={confirmDialog?.title ?? ""}
