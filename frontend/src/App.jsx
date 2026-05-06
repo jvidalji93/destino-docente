@@ -1294,23 +1294,25 @@ function App() {
         </div>
 
         <form className="search-form" onSubmit={searchSchools}>
-          <label>
-            Radio km
-            <input
-              name="radius_km"
-              type="number"
-              min="0.1"
-              max="100"
-              step="0.1"
-              value={form.radius_km}
-              onChange={updateForm}
-              required
-            />
-          </label>
-          <div className="form-actions">
+          <div className="primary-search-row">
+            <label>
+              Radio km
+              <input
+                name="radius_km"
+                type="number"
+                min="0.1"
+                max="100"
+                step="0.1"
+                value={form.radius_km}
+                onChange={updateForm}
+                required
+              />
+            </label>
             <button type="submit" disabled={isLoading || isLocating}>
               {isLoading ? "Buscando" : "Buscar"}
             </button>
+          </div>
+          <div className="form-actions">
             <button
               className="secondary-button"
               type="button"
@@ -1397,22 +1399,24 @@ function App() {
                 Mostrando {sortedSchools.length} de {schools.length} centros
               </span>
             </div>
-            <button
-              className="download-button"
-              type="button"
-              disabled={sortedSchools.length === 0}
-              onClick={() => downloadCsv(sortedSchools, "schools-nearby.csv")}
-            >
-              Descargar CSV
-            </button>
-            <button
-              className="download-button primary-action"
-              type="button"
-              disabled={addableSelectedSchools.length === 0}
-              onClick={addSelectedToMyList}
-            >
-              Añadir a mi lista
-            </button>
+            <div className="results-actions">
+              <button
+                className="download-button"
+                type="button"
+                disabled={sortedSchools.length === 0}
+                onClick={() => downloadCsv(sortedSchools, "schools-nearby.csv")}
+              >
+                Descargar CSV
+              </button>
+              <button
+                className="download-button primary-action"
+                type="button"
+                disabled={addableSelectedSchools.length === 0}
+                onClick={addSelectedToMyList}
+              >
+                Añadir a mi lista
+              </button>
+            </div>
           </div>
 
           {activeFilterChips.length > 0 && (

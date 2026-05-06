@@ -35,10 +35,10 @@ select {
   grid-column: 2;
   order: 2;
   display: flex;
-  gap: 24px;
+  gap: 18px;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 22px 24px;
+  padding: 16px 18px;
   border: 1px solid #d7dde5;
   border-radius: 8px;
   background: #ffffff;
@@ -97,8 +97,8 @@ select {
 }
 
 .toolbar h1 {
-  margin: 4px 0 0;
-  font-size: 24px;
+  margin: 2px 0 0;
+  font-size: 22px;
   line-height: 1.1;
 }
 
@@ -112,21 +112,23 @@ select {
 }
 
 .toolbar p {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: #5f6c7b;
 }
 
 .toolbar .help-text {
   max-width: 520px;
-  color: #334155;
-  font-size: 14px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .search-form {
   display: grid;
-  grid-template-columns: minmax(120px, 160px) minmax(260px, auto);
-  gap: 12px;
-  align-items: end;
+  grid-template-columns: minmax(220px, auto);
+  gap: 10px;
+  align-items: start;
+  justify-items: end;
 }
 
 .search-form label {
@@ -155,20 +157,36 @@ select {
 .form-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .search-form button {
-  height: 40px;
+  height: 36px;
   border: 0;
   border-radius: 6px;
-  padding: 0 18px;
+  padding: 0 12px;
   color: #ffffff;
   background: #2563eb;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.primary-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  justify-content: flex-end;
+}
+
+.primary-search-row label {
+  width: 132px;
+}
+
+.primary-search-row button {
+  padding: 0 18px;
 }
 
 .search-form button:disabled {
@@ -226,8 +244,9 @@ select {
 
 .advanced-controls {
   grid-column: 1 / -1;
+  justify-self: end;
   color: #526071;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .advanced-controls summary {
@@ -327,10 +346,10 @@ select {
   grid-column: 2;
   order: 5;
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px;
+  padding: 14px 16px;
   border: 1px solid #d7dde5;
   border-radius: 8px;
   background: #ffffff;
@@ -346,19 +365,27 @@ select {
 
 .results-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .results-header span {
   display: block;
-  margin-top: 4px;
+  margin-top: 3px;
   color: #5f6c7b;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .results-header .result-count {
   color: #172033;
   font-weight: 700;
+}
+
+.results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .download-button {
@@ -1236,7 +1263,17 @@ th {
 
   .search-form {
     grid-template-columns: 1fr;
-    margin-top: 18px;
+    justify-items: stretch;
+    margin-top: 14px;
+  }
+
+  .primary-search-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .primary-search-row label {
+    width: 100%;
   }
 
   .coordinate-fields {
@@ -1246,6 +1283,10 @@ th {
   .form-actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .advanced-controls {
+    justify-self: stretch;
   }
 
   .filters-panel,
@@ -1284,6 +1325,14 @@ th {
 
   .results-header {
     order: 7;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .results-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: stretch;
   }
 
   .table-wrap {
