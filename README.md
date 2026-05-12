@@ -223,7 +223,29 @@ Endpoints disponibles para usuarios autenticados:
 - `PATCH /me/school-list/items/{item_id}`: actualiza nota o posición.
 - `DELETE /me/school-list/items/{item_id}`: elimina un centro de la lista.
 
-Si inicias sesión y existe una lista local en este navegador, el frontend ofrece guardarla en tu cuenta o mantenerla solo local. Por ahora no se migran preferencias ni ubicación predeterminada al backend.
+Si inicias sesión y existe una lista local en este navegador, el frontend ofrece guardarla en tu cuenta o mantenerla solo local.
+
+## Preferencias Por Usuario
+
+Las preferencias también mantienen dos modos:
+
+- Invitado: filtros, criterios, radio y ubicación predeterminada se guardan en `localStorage`.
+- Usuario con sesión iniciada: esas preferencias se guardan en PostgreSQL.
+
+Vuelve a ejecutar la inicialización para crear la tabla `user_preferences` si vienes de una versión anterior:
+
+```powershell
+cd backend
+$env:PYTHONPATH = "."
+python -m scripts.init_db
+```
+
+Endpoints disponibles para usuarios autenticados:
+
+- `GET /me/preferences`: devuelve preferencias de búsqueda y ubicación predeterminada.
+- `PUT /me/preferences`: guarda preferencias de búsqueda, ubicación predeterminada, o ambas.
+
+Si inicias sesión y ya existían preferencias locales en el navegador, el frontend ofrece guardarlas en tu cuenta o mantenerlas solo local. Las preferencias siguen siendo independientes de `Mi lista`.
 
 ## Importar Datos Desde CSV
 

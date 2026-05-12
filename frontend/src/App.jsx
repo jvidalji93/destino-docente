@@ -4,6 +4,7 @@ import L from "leaflet";
 const API_URL = "http://127.0.0.1:8000/schools/nearby";
 const AUTH_API_URL = "http://127.0.0.1:8000/auth";
 const SCHOOL_LIST_API_URL = "http://127.0.0.1:8000/me/school-list";
+const PREFERENCES_API_URL = "http://127.0.0.1:8000/me/preferences";
 const DEFAULT_SEARCH = {
   lat: "40.4168",
   lng: "-3.7038",
@@ -430,6 +431,20 @@ function loadStoredDefaultLocation() {
   }
 }
 
+function normalizePreferencesResponse(payload) {
+  return {
+    searchPreferences: normalizeStoredPreferences(payload?.search_preferences),
+    defaultLocation: normalizeStoredDefaultLocation(payload?.default_location),
+  };
+}
+
+function buildPreferencesPayload(searchPreferences, defaultLocation) {
+  return {
+    search_preferences: searchPreferences,
+    default_location: defaultLocation,
+  };
+}
+
 function getInitialForm() {
   const storedPreferences = loadStoredPreferences();
   const storedDefaultLocation = loadStoredDefaultLocation();
@@ -505,6 +520,9 @@ function App() {
   const [pendingLocalList, setPendingLocalList] = useState([]);
   const [showLocalListMerge, setShowLocalListMerge] = useState(false);
   const [isMyListSyncing, setIsMyListSyncing] = useState(false);
+  const [pendingLocalPreferences, setPendingLocalPreferences] = useState(null);
+  const [showLocalPreferencesMerge, setShowLocalPreferencesMerge] = useState(false);
+  const [isPreferencesSyncing, setIsPreferencesSyncing] = useState(false);
 
   const center = useMemo(
     () => [Number(form.lat) || Number(DEFAULT_SEARCH.lat), Number(form.lng) || Number(DEFAULT_SEARCH.lng)],
@@ -964,6 +982,35 @@ function App() {
     return normalizeSchoolListResponse(await response.json());
   }
 
+  async function fetchAccountPreferences() {
+    const response = await fetch(PREFERENCES_API_URL, {
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return normalizePreferencesResponse(await response.json());
+  }
+
+  async function saveAccountPreferences(searchPreferences, defaultLocation) {
+    const response = await fetch(PREFERENCES_API_URL, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(buildPreferencesPayload(searchPreferences, defaultLocation)),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return normalizePreferencesResponse(await response.json());
+  }
+
   async function loadAccountSchoolList() {
     const accountList = await fetchAccountSchoolList();
     const localList = loadStoredMyList();
@@ -979,6 +1026,44 @@ function App() {
     }
   }
 
+  async function loadAccountPreferences() {
+    const accountPreferences = await fetchAccountPreferences();
+    const localSearchPreferences = loadStoredPreferences();
+    const localDefaultLocation = loadStoredDefaultLocation();
+    const hasLocalPreferences = Boolean(localSearchPreferences || localDefaultLocation);
+
+    setStoredPreferences(accountPreferences.searchPreferences);
+    setStoredDefaultLocation(accountPreferences.defaultLocation);
+
+    if (accountPreferences.searchPreferences) {
+      applyPreferences(accountPreferences.searchPreferences);
+    }
+
+    if (accountPreferences.defaultLocation) {
+      const nextForm = {
+        ...formRef.current,
+        lat: accountPreferences.defaultLocation.latitude,
+        lng: accountPreferences.defaultLocation.longitude,
+        radius_km: accountPreferences.searchPreferences?.radius_km ?? formRef.current.radius_km,
+      };
+
+      setForm(nextForm);
+      formRef.current = nextForm;
+      runSearch(nextForm);
+    }
+
+    if (hasLocalPreferences) {
+      setPendingLocalPreferences({
+        searchPreferences: localSearchPreferences,
+        defaultLocation: localDefaultLocation,
+      });
+      setShowLocalPreferencesMerge(true);
+    } else {
+      setPendingLocalPreferences(null);
+      setShowLocalPreferencesMerge(false);
+    }
+  }
+
   async function applyAuthenticatedUser(user) {
     setAuthUser(user);
 
@@ -987,6 +1072,14 @@ function App() {
     } catch (error) {
       setMyList([]);
       showToast("No se pudo cargar Mi lista de tu cuenta.");
+    }
+
+    try {
+      await loadAccountPreferences();
+    } catch (error) {
+      setStoredPreferences(null);
+      setStoredDefaultLocation(null);
+      showToast("No se pudieron cargar tus preferencias.");
     }
   }
 
@@ -999,6 +1092,8 @@ function App() {
       if (!response.ok) {
         setAuthUser(null);
         setMyList(loadStoredMyList());
+        setStoredPreferences(loadStoredPreferences());
+        setStoredDefaultLocation(loadStoredDefaultLocation());
         return;
       }
 
@@ -1006,6 +1101,8 @@ function App() {
     } catch (error) {
       setAuthUser(null);
       setMyList(loadStoredMyList());
+      setStoredPreferences(loadStoredPreferences());
+      setStoredDefaultLocation(loadStoredDefaultLocation());
     }
   }
 
@@ -1065,8 +1162,12 @@ function App() {
       });
       setAuthUser(null);
       setMyList(loadStoredMyList());
+      setStoredPreferences(loadStoredPreferences());
+      setStoredDefaultLocation(loadStoredDefaultLocation());
       setPendingLocalList([]);
       setShowLocalListMerge(false);
+      setPendingLocalPreferences(null);
+      setShowLocalPreferencesMerge(false);
       showToast("Sesión cerrada");
     } catch (error) {
       setAuthStatus("No se pudo cerrar la sesión.");
@@ -1159,77 +1260,188 @@ function App() {
     setScoreCriteria(normalizedPreferences.scoreCriteria);
   }
 
-  function savePreferences() {
+  async function savePreferences() {
     const nextPreferences = getCurrentPreferences();
+
+    if (authUser) {
+      setIsPreferencesSyncing(true);
+
+      try {
+        const savedPreferences = await saveAccountPreferences(nextPreferences, storedDefaultLocation);
+        setStoredPreferences(savedPreferences.searchPreferences);
+        setStoredDefaultLocation(savedPreferences.defaultLocation);
+        showToast("Preferencias guardadas");
+      } catch (error) {
+        showToast("No se pudieron guardar las preferencias.");
+      } finally {
+        setIsPreferencesSyncing(false);
+      }
+
+      return;
+    }
+
     window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(nextPreferences));
     setStoredPreferences(normalizeStoredPreferences(nextPreferences));
     showToast("Preferencias guardadas");
   }
 
-  function restorePreferences() {
-    const storedPreferences = loadStoredPreferences();
+  async function restorePreferences() {
+    let preferencesToRestore = authUser ? storedPreferences : loadStoredPreferences();
 
-    if (!storedPreferences) {
+    if (authUser) {
+      try {
+        const accountPreferences = await fetchAccountPreferences();
+        setStoredPreferences(accountPreferences.searchPreferences);
+        setStoredDefaultLocation(accountPreferences.defaultLocation);
+        preferencesToRestore = accountPreferences.searchPreferences;
+      } catch (error) {
+        showToast("No se pudieron restaurar las preferencias.");
+        return;
+      }
+    }
+
+    if (!preferencesToRestore) {
       setStoredPreferences(null);
       showToast("No hay preferencias guardadas");
       return;
     }
 
-    applyPreferences(storedPreferences);
-    setStoredPreferences(storedPreferences);
+    applyPreferences(preferencesToRestore);
+    setStoredPreferences(preferencesToRestore);
     showToast("Preferencias restauradas");
   }
 
-  function deletePreferences() {
+  async function deletePreferences() {
+    if (authUser) {
+      setIsPreferencesSyncing(true);
+
+      try {
+        const savedPreferences = await saveAccountPreferences(null, storedDefaultLocation);
+        setStoredPreferences(savedPreferences.searchPreferences);
+        setStoredDefaultLocation(savedPreferences.defaultLocation);
+        showToast("Preferencias borradas");
+      } catch (error) {
+        showToast("No se pudieron borrar las preferencias.");
+      } finally {
+        setIsPreferencesSyncing(false);
+      }
+
+      return;
+    }
+
     window.localStorage.removeItem(PREFERENCES_STORAGE_KEY);
     setStoredPreferences(null);
     showToast("Preferencias borradas");
   }
 
-  function saveDefaultLocation() {
+  async function saveDefaultLocation() {
     if (!hasValidCoordinates(form.lat, form.lng)) {
       showToast("Selecciona primero una ubicación en el mapa o usa tu ubicación actual");
       return;
     }
 
+    const nextDefaultLocation = {
+      latitude: Number(form.lat),
+      longitude: Number(form.lng),
+      label: "Ubicación predeterminada",
+    };
+
+    if (authUser) {
+      setIsPreferencesSyncing(true);
+
+      try {
+        const savedPreferences = await saveAccountPreferences(storedPreferences, nextDefaultLocation);
+        setStoredPreferences(savedPreferences.searchPreferences);
+        setStoredDefaultLocation(savedPreferences.defaultLocation);
+        showToast("Ubicación predeterminada guardada");
+      } catch (error) {
+        showToast("No se pudo guardar la ubicación predeterminada.");
+      } finally {
+        setIsPreferencesSyncing(false);
+      }
+
+      return;
+    }
+
     window.localStorage.setItem(
       DEFAULT_LOCATION_STORAGE_KEY,
-      JSON.stringify({
-        latitude: Number(form.lat),
-        longitude: Number(form.lng),
-        label: "Ubicación predeterminada",
-      }),
+      JSON.stringify(nextDefaultLocation),
     );
     setStoredDefaultLocation(loadStoredDefaultLocation());
     showToast("Ubicación predeterminada guardada");
   }
 
   function useDefaultLocation() {
-    const storedDefaultLocation = loadStoredDefaultLocation();
+    const defaultLocation = authUser ? storedDefaultLocation : loadStoredDefaultLocation();
 
-    if (!storedDefaultLocation) {
+    if (!defaultLocation) {
       setStoredDefaultLocation(null);
       return;
     }
 
     const nextForm = {
       ...form,
-      lat: storedDefaultLocation.latitude,
-      lng: storedDefaultLocation.longitude,
+      lat: defaultLocation.latitude,
+      lng: defaultLocation.longitude,
     };
 
     setForm(nextForm);
     formRef.current = nextForm;
     runSearch(nextForm);
-    setStoredDefaultLocation(storedDefaultLocation);
+    setStoredDefaultLocation(defaultLocation);
     setActiveDrawer(null);
     showToast("Ubicación predeterminada aplicada");
   }
 
-  function deleteDefaultLocation() {
+  async function deleteDefaultLocation() {
+    if (authUser) {
+      setIsPreferencesSyncing(true);
+
+      try {
+        const savedPreferences = await saveAccountPreferences(storedPreferences, null);
+        setStoredPreferences(savedPreferences.searchPreferences);
+        setStoredDefaultLocation(savedPreferences.defaultLocation);
+        showToast("Ubicación predeterminada borrada");
+      } catch (error) {
+        showToast("No se pudo borrar la ubicación predeterminada.");
+      } finally {
+        setIsPreferencesSyncing(false);
+      }
+
+      return;
+    }
+
     window.localStorage.removeItem(DEFAULT_LOCATION_STORAGE_KEY);
     setStoredDefaultLocation(null);
     showToast("Ubicación predeterminada borrada");
+  }
+
+  async function saveLocalPreferencesToAccount() {
+    const localSearchPreferences = pendingLocalPreferences?.searchPreferences ?? storedPreferences;
+    const localDefaultLocation = pendingLocalPreferences?.defaultLocation ?? storedDefaultLocation;
+
+    setIsPreferencesSyncing(true);
+
+    try {
+      const savedPreferences = await saveAccountPreferences(localSearchPreferences, localDefaultLocation);
+      setStoredPreferences(savedPreferences.searchPreferences);
+      setStoredDefaultLocation(savedPreferences.defaultLocation);
+      window.localStorage.removeItem(PREFERENCES_STORAGE_KEY);
+      window.localStorage.removeItem(DEFAULT_LOCATION_STORAGE_KEY);
+      setPendingLocalPreferences(null);
+      setShowLocalPreferencesMerge(false);
+      showToast("Preferencias locales guardadas en tu cuenta.");
+    } catch (error) {
+      showToast("No se pudieron guardar las preferencias locales.");
+    } finally {
+      setIsPreferencesSyncing(false);
+    }
+  }
+
+  function keepLocalPreferencesOnly() {
+    setPendingLocalPreferences(null);
+    setShowLocalPreferencesMerge(false);
+    showToast("Preferencias locales mantenidas en este navegador.");
   }
 
   async function runSearch(searchValues) {
@@ -1635,6 +1847,27 @@ function App() {
                 Guardar en mi cuenta
               </button>
               <button className="download-button" type="button" onClick={keepLocalListOnly}>
+                Mantener solo local
+              </button>
+            </div>
+          </div>
+        )}
+        {authUser && showLocalPreferencesMerge && pendingLocalPreferences && (
+          <div className="local-list-merge" role="status">
+            <div>
+              <strong>Tienes preferencias locales guardadas.</strong>
+              <span>¿Quieres guardarlas en tu cuenta?</span>
+            </div>
+            <div className="local-list-merge-actions">
+              <button
+                className="download-button primary-action"
+                type="button"
+                disabled={isPreferencesSyncing}
+                onClick={saveLocalPreferencesToAccount}
+              >
+                Guardar en mi cuenta
+              </button>
+              <button className="download-button" type="button" onClick={keepLocalPreferencesOnly}>
                 Mantener solo local
               </button>
             </div>
@@ -2386,10 +2619,15 @@ function App() {
                       </div>
                     </dl>
                     <div className="preference-actions">
-                      <button className="download-button" type="button" onClick={useDefaultLocation}>
+                      <button className="download-button" type="button" disabled={isPreferencesSyncing} onClick={useDefaultLocation}>
                         Usar ubicación
                       </button>
-                      <button className="download-button danger-action" type="button" onClick={deleteDefaultLocation}>
+                      <button
+                        className="download-button danger-action"
+                        type="button"
+                        disabled={isPreferencesSyncing}
+                        onClick={deleteDefaultLocation}
+                      >
                         Borrar ubicación
                       </button>
                     </div>
@@ -2401,7 +2639,7 @@ function App() {
                 )}
                 {hasValidCoordinates(form.lat, form.lng) && (
                   <div className="preference-actions">
-                    <button className="download-button" type="button" onClick={saveDefaultLocation}>
+                    <button className="download-button" type="button" disabled={isPreferencesSyncing} onClick={saveDefaultLocation}>
                       Guardar ubicación actual como predeterminada
                     </button>
                   </div>
@@ -2424,16 +2662,16 @@ function App() {
                   <p className="preference-empty">No hay preferencias de búsqueda guardadas</p>
                 )}
                 <div className="preference-actions">
-                  <button className="download-button" type="button" onClick={savePreferences}>
+                  <button className="download-button" type="button" disabled={isPreferencesSyncing} onClick={savePreferences}>
                     Guardar preferencias actuales
                   </button>
-                  <button className="download-button" type="button" onClick={restorePreferences}>
+                  <button className="download-button" type="button" disabled={isPreferencesSyncing} onClick={restorePreferences}>
                     Restaurar preferencias
                   </button>
                   <button
                     className="download-button danger-action"
                     type="button"
-                    disabled={!storedPreferencesAvailable}
+                    disabled={!storedPreferencesAvailable || isPreferencesSyncing}
                     onClick={deletePreferences}
                   >
                     Borrar preferencias

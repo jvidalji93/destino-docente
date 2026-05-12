@@ -11,6 +11,7 @@ from app.auth import (
     require_current_user,
 )
 from app.db import check_postgis_connection
+from app.preferences import UserPreferencesPayload, get_user_preferences, update_user_preferences
 from app.school_lists import (
     PatchSchoolListItemRequest,
     ReplaceSchoolListRequest,
@@ -105,6 +106,18 @@ def me_patch_school_list_item(
 def me_delete_school_list_item(item_id: int, request: Request) -> dict:
     user = require_current_user(request)
     return delete_school_list_item(user["id"], item_id)
+
+
+@app.get("/me/preferences")
+def me_preferences(request: Request) -> dict:
+    user = require_current_user(request)
+    return get_user_preferences(user["id"])
+
+
+@app.put("/me/preferences")
+def me_update_preferences(request: Request, payload: UserPreferencesPayload) -> dict:
+    user = require_current_user(request)
+    return update_user_preferences(user["id"], payload)
 
 
 @app.get("/schools/nearby")

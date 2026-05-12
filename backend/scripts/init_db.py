@@ -118,6 +118,18 @@ CREATE INDEX IF NOT EXISTS idx_school_list_items_school_id
 
 CREATE INDEX IF NOT EXISTS idx_school_list_items_position
     ON school_list_items (list_id, position);
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    search_preferences_json JSONB,
+    default_location_json JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id
+    ON user_preferences (user_id);
 """
 
 
