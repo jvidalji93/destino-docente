@@ -86,6 +86,38 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id
 
 CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at
     ON user_sessions (expires_at);
+
+CREATE TABLE IF NOT EXISTS school_lists (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS school_list_items (
+    id BIGSERIAL PRIMARY KEY,
+    list_id BIGINT NOT NULL REFERENCES school_lists(id) ON DELETE CASCADE,
+    school_id BIGINT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (list_id, school_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_school_lists_user_id
+    ON school_lists (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_school_list_items_list_id
+    ON school_list_items (list_id);
+
+CREATE INDEX IF NOT EXISTS idx_school_list_items_school_id
+    ON school_list_items (school_id);
+
+CREATE INDEX IF NOT EXISTS idx_school_list_items_position
+    ON school_list_items (list_id, position);
 """
 
 

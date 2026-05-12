@@ -177,6 +177,42 @@ select {
   font-weight: 800;
 }
 
+.local-list-merge {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 12px;
+  color: #1e3a8a;
+  background: #eff6ff;
+}
+
+.local-list-merge > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.local-list-merge strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.local-list-merge span {
+  color: #526071;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.local-list-merge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .toolbar h1 {
   margin: 2px 0 0;
   font-size: 22px;
@@ -1334,7 +1370,9 @@ th {
 
   .auth-user,
   .auth-guest,
-  .auth-form {
+  .auth-form,
+  .local-list-merge,
+  .local-list-merge-actions {
     display: grid;
     grid-template-columns: 1fr;
     align-items: stretch;

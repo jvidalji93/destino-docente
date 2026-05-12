@@ -200,6 +200,31 @@ Invoke-RestMethod `
   -WebSession $session
 ```
 
+## Persistencia De Mi Lista
+
+La app mantiene dos modos:
+
+- Invitado: `Mi lista` sigue guardándose en `localStorage` del navegador.
+- Usuario con sesión iniciada: `Mi lista` se guarda en PostgreSQL mediante endpoints protegidos por cookie HttpOnly.
+
+Después de actualizar el proyecto, vuelve a inicializar la base de datos para crear las tablas de listas:
+
+```powershell
+cd backend
+$env:PYTHONPATH = "."
+python -m scripts.init_db
+```
+
+Endpoints disponibles para usuarios autenticados:
+
+- `GET /me/school-list`: devuelve la lista principal del usuario.
+- `PUT /me/school-list`: reemplaza la lista completa con `items`.
+- `POST /me/school-list/items`: añade un centro si no existe ya en la lista.
+- `PATCH /me/school-list/items/{item_id}`: actualiza nota o posición.
+- `DELETE /me/school-list/items/{item_id}`: elimina un centro de la lista.
+
+Si inicias sesión y existe una lista local en este navegador, el frontend ofrece guardarla en tu cuenta o mantenerla solo local. Por ahora no se migran preferencias ni ubicación predeterminada al backend.
+
 ## Importar Datos Desde CSV
 
 Las fuentes abiertas candidatas y el formato base se documentan en `docs/data-sources.md`.

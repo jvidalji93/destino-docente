@@ -3,6 +3,7 @@ import L from "leaflet";
 
 const API_URL = "http://127.0.0.1:8000/schools/nearby";
 const AUTH_API_URL = "http://127.0.0.1:8000/auth";
+const SCHOOL_LIST_API_URL = "http://127.0.0.1:8000/me/school-list";
 const DEFAULT_SEARCH = {
   lat: "40.4168",
   lng: "-3.7038",
@@ -163,6 +164,66 @@ function calculateSchoolScore(school, scoreCriteria, radiusKm) {
 function stripDerivedSchoolFields(school) {
   const { score, ...storedSchool } = school;
   return storedSchool;
+}
+
+function getSchoolId(school) {
+  return school.school_id ?? school.id;
+}
+
+function normalizeSchoolListItem(item) {
+  return {
+    ...item,
+    id: item.school_id ?? item.id,
+    school_id: item.school_id ?? item.id,
+    list_item_id: item.list_item_id ?? null,
+    notes: item.notes ?? "",
+    distance_km: item.distance_km ?? null,
+  };
+}
+
+function normalizeSchoolListResponse(payload) {
+  return Array.isArray(payload?.items) ? payload.items.map(normalizeSchoolListItem) : [];
+}
+
+function buildSchoolListPayload(list) {
+  return {
+    items: list.map((school, index) => ({
+      school_id: Number(getSchoolId(school)),
+      position: index + 1,
+      notes: school.notes ?? "",
+    })),
+  };
+}
+
+function mergeSchoolLists(primaryList, secondaryList) {
+  const seenSchoolIds = new Set();
+  const mergedList = [];
+
+  [...primaryList, ...secondaryList].forEach((school) => {
+    const schoolId = Number(getSchoolId(school));
+
+    if (!Number.isFinite(schoolId) || seenSchoolIds.has(schoolId)) {
+      return;
+    }
+
+    seenSchoolIds.add(schoolId);
+    mergedList.push(normalizeSchoolListItem(school));
+  });
+
+  return mergedList;
+}
+
+function mergeSavedListWithLocalDetails(savedList, localList) {
+  const localBySchoolId = new Map(localList.map((school) => [Number(getSchoolId(school)), school]));
+
+  return savedList.map((savedSchool) => {
+    const localSchool = localBySchoolId.get(Number(getSchoolId(savedSchool)));
+
+    return {
+      ...savedSchool,
+      distance_km: savedSchool.distance_km ?? localSchool?.distance_km ?? null,
+    };
+  });
 }
 
 function getActiveLabel(count) {
@@ -441,13 +502,16 @@ function App() {
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
   const [myList, setMyList] = useState(loadStoredMyList);
   const [myListSortConfig, setMyListSortConfig] = useState({ key: "distance_km", direction: "asc" });
+  const [pendingLocalList, setPendingLocalList] = useState([]);
+  const [showLocalListMerge, setShowLocalListMerge] = useState(false);
+  const [isMyListSyncing, setIsMyListSyncing] = useState(false);
 
   const center = useMemo(
     () => [Number(form.lat) || Number(DEFAULT_SEARCH.lat), Number(form.lng) || Number(DEFAULT_SEARCH.lng)],
     [form.lat, form.lng],
   );
   const myListIds = useMemo(() => {
-    return new Set(myList.map((school) => school.id));
+    return new Set(myList.map((school) => getSchoolId(school)));
   }, [myList]);
   const provinceOptions = useMemo(() => {
     return uniqueSorted(schools.map((school) => school.province));
@@ -717,8 +781,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(MY_LIST_STORAGE_KEY, JSON.stringify(myList));
-  }, [myList]);
+    if (!authUser) {
+      window.localStorage.setItem(MY_LIST_STORAGE_KEY, JSON.stringify(myList));
+    }
+  }, [authUser, myList]);
 
   useEffect(() => {
     if (toasts.length === 0) {
@@ -869,6 +935,61 @@ function App() {
     }));
   }
 
+  async function fetchAccountSchoolList() {
+    const response = await fetch(SCHOOL_LIST_API_URL, {
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return normalizeSchoolListResponse(await response.json());
+  }
+
+  async function replaceAccountSchoolList(nextList) {
+    const response = await fetch(SCHOOL_LIST_API_URL, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(buildSchoolListPayload(nextList)),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return normalizeSchoolListResponse(await response.json());
+  }
+
+  async function loadAccountSchoolList() {
+    const accountList = await fetchAccountSchoolList();
+    const localList = loadStoredMyList();
+
+    setMyList(accountList);
+
+    if (localList.length > 0) {
+      setPendingLocalList(localList.map(normalizeSchoolListItem));
+      setShowLocalListMerge(true);
+    } else {
+      setPendingLocalList([]);
+      setShowLocalListMerge(false);
+    }
+  }
+
+  async function applyAuthenticatedUser(user) {
+    setAuthUser(user);
+
+    try {
+      await loadAccountSchoolList();
+    } catch (error) {
+      setMyList([]);
+      showToast("No se pudo cargar Mi lista de tu cuenta.");
+    }
+  }
+
   async function loadCurrentUser() {
     try {
       const response = await fetch(`${AUTH_API_URL}/me`, {
@@ -877,12 +998,14 @@ function App() {
 
       if (!response.ok) {
         setAuthUser(null);
+        setMyList(loadStoredMyList());
         return;
       }
 
-      setAuthUser(await response.json());
+      await applyAuthenticatedUser(await response.json());
     } catch (error) {
       setAuthUser(null);
+      setMyList(loadStoredMyList());
     }
   }
 
@@ -921,7 +1044,7 @@ function App() {
       }
 
       const user = await response.json();
-      setAuthUser(user);
+      await applyAuthenticatedUser(user);
       setAuthForm({ email: "", password: "", display_name: "" });
       showToast(authMode === "register" ? "Cuenta creada" : "Sesión iniciada");
     } catch (error) {
@@ -941,6 +1064,9 @@ function App() {
         credentials: "include",
       });
       setAuthUser(null);
+      setMyList(loadStoredMyList());
+      setPendingLocalList([]);
+      setShowLocalListMerge(false);
       showToast("Sesión cerrada");
     } catch (error) {
       setAuthStatus("No se pudo cerrar la sesión.");
@@ -1143,12 +1269,10 @@ function App() {
     setSortConfig((current) => toggleSort(current, key));
   }
 
-  function changeMyListSort(key) {
-    setMyListSortConfig((current) => {
-      const nextSortConfig = toggleSort(current, key);
-      setMyList((currentMyList) => sortSchools(currentMyList, nextSortConfig));
-      return nextSortConfig;
-    });
+  async function changeMyListSort(key) {
+    const nextSortConfig = toggleSort(myListSortConfig, key);
+    setMyListSortConfig(nextSortConfig);
+    await applyMyListUpdate(sortSchools(myList, nextSortConfig));
   }
 
   function toggleSort(current, key) {
@@ -1181,6 +1305,49 @@ function App() {
   function showToast(message) {
     const id = `${Date.now()}-${Math.random()}`;
     setToasts((current) => [...current, { id, message }]);
+  }
+
+  async function applyMyListUpdate(nextList) {
+    const normalizedList = nextList.map(normalizeSchoolListItem);
+    setMyList(normalizedList);
+
+    if (!authUser) {
+      return { list: normalizedList, synced: true };
+    }
+
+    setIsMyListSyncing(true);
+
+    try {
+      const savedList = await replaceAccountSchoolList(normalizedList);
+      const nextList = mergeSavedListWithLocalDetails(savedList, normalizedList);
+      setMyList(nextList);
+      return { list: nextList, synced: true };
+    } catch (error) {
+      showToast("No se pudo guardar Mi lista en tu cuenta.");
+      return { list: normalizedList, synced: false };
+    } finally {
+      setIsMyListSyncing(false);
+    }
+  }
+
+  async function saveLocalListToAccount() {
+    const mergedList = mergeSchoolLists(pendingLocalList, myList);
+    const result = await applyMyListUpdate(mergedList);
+
+    if (!result.synced) {
+      return;
+    }
+
+    window.localStorage.removeItem(MY_LIST_STORAGE_KEY);
+    setPendingLocalList([]);
+    setShowLocalListMerge(false);
+    showToast("Lista local guardada en tu cuenta.");
+  }
+
+  function keepLocalListOnly() {
+    setPendingLocalList([]);
+    setShowLocalListMerge(false);
+    showToast("Lista local mantenida en este navegador.");
   }
 
   function dismissToast(toastId) {
@@ -1230,22 +1397,23 @@ function App() {
     });
   }
 
-  function addSelectedToMyList() {
+  async function addSelectedToMyList() {
     if (addableSelectedSchools.length === 0) {
       return;
     }
 
     const addedCount = addableSelectedSchools.length;
+    const nextList = [
+      ...myList,
+      ...addableSelectedSchools.map((school) => ({
+        ...stripDerivedSchoolFields(school),
+        id: school.id,
+        school_id: school.id,
+        notes: "",
+      })),
+    ];
 
-    setMyList((current) => {
-      return [
-        ...current,
-        ...addableSelectedSchools.map((school) => ({
-          ...stripDerivedSchoolFields(school),
-          notes: "",
-        })),
-      ];
-    });
+    await applyMyListUpdate(nextList);
     setAddFeedbackCount(addedCount);
     showToast(
       addedCount === 1
@@ -1271,31 +1439,29 @@ function App() {
       confirmLabel: "Quitar centro",
       cancelLabel: "Cancelar",
       variant: "danger",
-      onConfirm: () => {
-        setMyList((current) => current.filter((school) => school.id !== schoolId));
+      onConfirm: async () => {
+        await applyMyListUpdate(myList.filter((school) => getSchoolId(school) !== schoolId));
         showToast("Centro eliminado de Mi lista.");
       },
     });
   }
 
-  function moveMyListItem(index, direction) {
-    setMyList((current) => {
-      const targetIndex = index + direction;
+  async function moveMyListItem(index, direction) {
+    const targetIndex = index + direction;
 
-      if (targetIndex < 0 || targetIndex >= current.length) {
-        return current;
-      }
+    if (targetIndex < 0 || targetIndex >= myList.length) {
+      return;
+    }
 
-      const nextList = [...current];
-      const [movedSchool] = nextList.splice(index, 1);
-      nextList.splice(targetIndex, 0, movedSchool);
-      return nextList;
-    });
+    const nextList = [...myList];
+    const [movedSchool] = nextList.splice(index, 1);
+    nextList.splice(targetIndex, 0, movedSchool);
+    await applyMyListUpdate(nextList);
   }
 
-  function updateMyListNotes(schoolId, notes) {
-    setMyList((current) =>
-      current.map((school) => (school.id === schoolId ? { ...school, notes } : school)),
+  async function updateMyListNotes(schoolId, notes) {
+    await applyMyListUpdate(
+      myList.map((school) => (getSchoolId(school) === schoolId ? { ...school, notes } : school)),
     );
   }
 
@@ -1310,8 +1476,8 @@ function App() {
       confirmLabel: "Vaciar lista",
       cancelLabel: "Cancelar",
       variant: "danger",
-      onConfirm: () => {
-        setMyList([]);
+      onConfirm: async () => {
+        await applyMyListUpdate([]);
         showToast("Mi lista se ha vaciado.");
       },
     });
@@ -1453,6 +1619,27 @@ function App() {
           </div>
         )}
         {authStatus && <p className="auth-status">{authStatus}</p>}
+        {authUser && showLocalListMerge && pendingLocalList.length > 0 && (
+          <div className="local-list-merge" role="status">
+            <div>
+              <strong>Tienes una lista local en este navegador.</strong>
+              <span>¿Quieres guardarla en tu cuenta?</span>
+            </div>
+            <div className="local-list-merge-actions">
+              <button
+                className="download-button primary-action"
+                type="button"
+                disabled={isMyListSyncing}
+                onClick={saveLocalListToAccount}
+              >
+                Guardar en mi cuenta
+              </button>
+              <button className="download-button" type="button" onClick={keepLocalListOnly}>
+                Mantener solo local
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="toolbar" aria-label="Búsqueda de centros">

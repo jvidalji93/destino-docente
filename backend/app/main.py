@@ -11,6 +11,16 @@ from app.auth import (
     require_current_user,
 )
 from app.db import check_postgis_connection
+from app.school_lists import (
+    PatchSchoolListItemRequest,
+    ReplaceSchoolListRequest,
+    SchoolListItemPayload,
+    add_school_list_item,
+    delete_school_list_item,
+    get_main_school_list,
+    patch_school_list_item,
+    replace_main_school_list,
+)
 from app.schools import find_nearby_schools
 
 
@@ -61,6 +71,40 @@ def auth_logout(request: Request, response: Response) -> dict[str, str]:
 @app.get("/auth/me")
 def auth_me(request: Request) -> dict:
     return public_user(require_current_user(request))
+
+
+@app.get("/me/school-list")
+def me_school_list(request: Request) -> dict:
+    user = require_current_user(request)
+    return get_main_school_list(user["id"])
+
+
+@app.put("/me/school-list")
+def me_replace_school_list(request: Request, payload: ReplaceSchoolListRequest) -> dict:
+    user = require_current_user(request)
+    return replace_main_school_list(user["id"], payload)
+
+
+@app.post("/me/school-list/items")
+def me_add_school_list_item(request: Request, payload: SchoolListItemPayload) -> dict:
+    user = require_current_user(request)
+    return add_school_list_item(user["id"], payload)
+
+
+@app.patch("/me/school-list/items/{item_id}")
+def me_patch_school_list_item(
+    item_id: int,
+    payload: PatchSchoolListItemRequest,
+    request: Request,
+) -> dict:
+    user = require_current_user(request)
+    return patch_school_list_item(user["id"], item_id, payload)
+
+
+@app.delete("/me/school-list/items/{item_id}")
+def me_delete_school_list_item(item_id: int, request: Request) -> dict:
+    user = require_current_user(request)
+    return delete_school_list_item(user["id"], item_id)
 
 
 @app.get("/schools/nearby")
