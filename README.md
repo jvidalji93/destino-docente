@@ -1,6 +1,6 @@
 # Destino Docente
 
-Aplicacion en desarrollo para consultar centros educativos cercanos usando PostgreSQL/PostGIS, FastAPI, React, Vite y Leaflet.
+Aplicación en desarrollo para consultar centros educativos cercanos usando PostgreSQL/PostGIS, FastAPI, React, Vite y Leaflet.
 
 ## Requisitos Previos En Windows
 
@@ -15,7 +15,7 @@ Docker Desktop debe estar arrancado antes de levantar la base de datos.
 
 ## Primer Arranque Local
 
-Los comandos siguientes asumen que estas en la raiz del repositorio.
+Los comandos siguientes asumen que estás en la raíz del repositorio.
 
 ### 1. Crear el archivo `.env`
 
@@ -32,7 +32,14 @@ Valores locales por defecto:
 - Host: `localhost`
 - Puerto local: `5433`
 
-Si cambias `POSTGRES_PORT`, cambia tambien el puerto de `DATABASE_URL` en tu `.env`.
+Si cambias `POSTGRES_PORT`, cambia también el puerto de `DATABASE_URL` en tu `.env`.
+
+Variables locales de sesión:
+
+- `SESSION_COOKIE_NAME`: nombre de la cookie de sesión.
+- `SESSION_EXPIRE_DAYS`: días de validez de la sesión.
+- `SESSION_COOKIE_SECURE`: usa `false` en desarrollo si accedes por `http://127.0.0.1`.
+- `SESSION_COOKIE_SAMESITE`: por defecto `lax`.
 
 ### 2. Levantar PostgreSQL/PostGIS
 
@@ -40,7 +47,7 @@ Si cambias `POSTGRES_PORT`, cambia tambien el puerto de `DATABASE_URL` en tu `.e
 docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
 
-Comprueba que el contenedor esta en marcha:
+Comprueba que el contenedor está en marcha:
 
 ```powershell
 docker compose --env-file .env -f infra/docker-compose.yml ps
@@ -56,12 +63,12 @@ El entorno local incluye Adminer solo para desarrollo. Accede desde el navegador
 http://localhost:8081
 ```
 
-Datos de conexion:
+Datos de conexión:
 
 - Sistema: `PostgreSQL`
 - Servidor: `db`
 - Usuario: valor de `POSTGRES_USER` en `.env`
-- Contrasena: valor de `POSTGRES_PASSWORD` en `.env`
+- Contraseña: valor de `POSTGRES_PASSWORD` en `.env`
 - Base de datos: valor de `POSTGRES_DB` en `.env`
 
 ### 3. Instalar dependencias del backend
@@ -82,9 +89,9 @@ $env:PYTHONPATH = "."
 python -m scripts.init_db
 ```
 
-Este script habilita PostGIS si no existe, crea la tabla `schools` y crea el indice espacial sobre `geom`.
+Este script habilita PostGIS si no existe, crea la tabla `schools`, crea las tablas `users` y `user_sessions`, y crea los índices necesarios.
 
-Si ya tenias una base de datos creada antes de cambios de esquema, vuelve a ejecutar este comando. El script es idempotente y añade columnas e indices nuevos sin borrar datos existentes.
+Si ya tenías una base de datos creada antes de cambios de esquema, vuelve a ejecutar este comando. El script es idempotente y añade columnas, tablas e índices nuevos sin borrar datos existentes.
 
 ### 5. Cargar datos de prueba
 
@@ -121,7 +128,7 @@ Invoke-RestMethod "http://127.0.0.1:8000/schools/nearby?lat=40.4168&lng=-3.7038&
 
 ### 7. Instalar dependencias del frontend
 
-Abre otra terminal en la raiz del repositorio:
+Abre otra terminal en la raíz del repositorio:
 
 ```powershell
 cd frontend
@@ -136,7 +143,7 @@ Desde `frontend`:
 npm run dev
 ```
 
-Vite mostrara la URL local, normalmente:
+Vite mostrará la URL local, normalmente:
 
 ```text
 http://127.0.0.1:5173
@@ -144,17 +151,54 @@ http://127.0.0.1:5173
 
 ## Probar La App De Extremo A Extremo
 
-1. Docker Desktop esta arrancado.
-2. PostgreSQL/PostGIS esta levantado con Docker Compose.
+1. Docker Desktop está arrancado.
+2. PostgreSQL/PostGIS está levantado con Docker Compose.
 3. La base de datos fue inicializada con `python -m scripts.init_db`.
 4. Los datos de prueba fueron cargados con `python -m scripts.seed_schools`.
-5. El backend esta arrancado en `http://127.0.0.1:8000`.
-6. El frontend esta arrancado en `http://127.0.0.1:5173`.
+5. El backend está arrancado en `http://127.0.0.1:8000`.
+6. El frontend está arrancado en `http://127.0.0.1:5173`.
 7. Abre el frontend en el navegador.
 8. Usa los valores por defecto de Madrid o pulsa `Usar mi ubicación`.
 9. Pulsa `Buscar`.
 
-Deberias ver centros educativos como puntos en el mapa y tambien en la tabla. La tabla permite ordenar resultados y descargar el CSV de los resultados visibles.
+Deberías ver centros educativos como puntos en el mapa y también en la tabla. La tabla permite ordenar resultados y descargar el CSV de los resultados visibles.
+
+## Probar Registro Y Login
+
+La app puede usarse como invitado. El login básico guarda una sesión en una cookie HttpOnly.
+
+En desarrollo, asegúrate de tener en `.env`:
+
+```env
+SESSION_COOKIE_SECURE=false
+SESSION_COOKIE_SAMESITE=lax
+```
+
+Si usas cookies de sesión, abre frontend y backend con `127.0.0.1` para evitar diferencias entre `localhost` y `127.0.0.1` durante el desarrollo local.
+
+Desde el navegador puedes usar el formulario superior para registrarte, iniciar sesión y cerrar sesión.
+
+También puedes probar la API desde PowerShell:
+
+```powershell
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:8000/auth/register `
+  -Method Post `
+  -WebSession $session `
+  -ContentType "application/json" `
+  -Body '{"email":"demo@example.com","password":"change_me_demo","display_name":"Demo"}'
+
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:8000/auth/me `
+  -WebSession $session
+
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:8000/auth/logout `
+  -Method Post `
+  -WebSession $session
+```
 
 ## Importar Datos Desde CSV
 
@@ -164,7 +208,7 @@ Las fuentes abiertas candidatas y el formato base se documentan en `docs/data-so
 
 Fuente oficial: Directorio de centros docentes no universitarios de Andalucía, Junta de Andalucía, curso 2024/2025.
 
-Descarga el CSV original desde la raiz del repositorio:
+Descarga el CSV original desde la raíz del repositorio:
 
 ```powershell
 New-Item -ItemType Directory -Force data\raw\andalucia
@@ -201,7 +245,7 @@ python -m scripts.import_schools_csv ..\data\processed\andalucia\andalucia_schoo
 
 ### Importador genérico
 
-El importador generico lee un CSV local con estas columnas iniciales:
+El importador genérico lee un CSV local con estas columnas iniciales:
 
 ```csv
 source_id;official_code;name;address;postal_code;municipality;province;autonomous_region;ownership;education_levels;latitude;longitude;phone;email;website
@@ -214,23 +258,23 @@ $env:PYTHONPATH = "."
 python -m scripts.import_schools_csv ..\data\raw\andalucia\centros.csv --source andalucia
 ```
 
-Si la base ya existia antes de preparar el importador, ejecuta primero:
+Si la base ya existía antes de preparar el importador, ejecuta primero:
 
 ```powershell
 $env:PYTHONPATH = "."
 python -m scripts.init_db
 ```
 
-Opciones utiles:
+Opciones útiles:
 
 ```powershell
 python -m scripts.import_schools_csv ..\data\raw\andalucia\centros.csv --source andalucia --dry-run
 python -m scripts.import_schools_csv ..\data\raw\andalucia\centros.csv --source andalucia --encoding utf-8-sig --delimiter ";"
 ```
 
-Los registros sin `latitude` o `longitude` validas se saltan y muestran un aviso. El importador no borra datos existentes; si encuentra duplicados, actualiza la fila existente. El criterio de duplicado es `source + source_id`, despues `source + official_code`, y por ultimo `name + municipality + province`.
+Los registros sin `latitude` o `longitude` válidas se saltan y muestran un aviso. El importador no borra datos existentes; si encuentra duplicados, actualiza la fila existente. El criterio de duplicado es `source + source_id`, después `source + official_code`, y por último `name + municipality + province`.
 
-## Comandos Utiles
+## Comandos Útiles
 
 Parar la base de datos:
 
@@ -253,5 +297,5 @@ deactivate
 ## Notas
 
 - No subas `.env` al repositorio.
-- No hay login ni búsqueda por dirección todavía.
+- No hay búsqueda por dirección todavía.
 - El frontend solo llama al backend local en `http://127.0.0.1:8000`.

@@ -1,6 +1,15 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth import (
+    LoginRequest,
+    RegisterRequest,
+    login_user,
+    logout_user,
+    public_user,
+    register_user,
+    require_current_user,
+)
 from app.db import check_postgis_connection
 from app.schools import find_nearby_schools
 
@@ -10,8 +19,8 @@ app = FastAPI(title="Destino Docente API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
-    allow_credentials=False,
-    allow_methods=["GET"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -32,6 +41,26 @@ def database_health() -> dict[str, str]:
         ) from exc
 
     return {"status": "ok", "postgis_version": postgis_version}
+
+
+@app.post("/auth/register")
+def auth_register(payload: RegisterRequest, response: Response) -> dict:
+    return register_user(payload, response)
+
+
+@app.post("/auth/login")
+def auth_login(payload: LoginRequest, response: Response) -> dict:
+    return login_user(payload, response)
+
+
+@app.post("/auth/logout")
+def auth_logout(request: Request, response: Response) -> dict[str, str]:
+    return logout_user(request, response)
+
+
+@app.get("/auth/me")
+def auth_me(request: Request) -> dict:
+    return public_user(require_current_user(request))
 
 
 @app.get("/schools/nearby")

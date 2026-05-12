@@ -2,6 +2,7 @@
 import L from "leaflet";
 
 const API_URL = "http://127.0.0.1:8000/schools/nearby";
+const AUTH_API_URL = "http://127.0.0.1:8000/auth";
 const DEFAULT_SEARCH = {
   lat: "40.4168",
   lng: "-3.7038",
@@ -426,6 +427,15 @@ function App() {
   const [addFeedbackCount, setAddFeedbackCount] = useState(0);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [authUser, setAuthUser] = useState(null);
+  const [authMode, setAuthMode] = useState("login");
+  const [authStatus, setAuthStatus] = useState("");
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authForm, setAuthForm] = useState({
+    email: "",
+    password: "",
+    display_name: "",
+  });
   const [storedPreferences, setStoredPreferences] = useState(loadStoredPreferences);
   const [storedDefaultLocation, setStoredDefaultLocation] = useState(loadStoredDefaultLocation);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(() => new Set());
@@ -703,6 +713,10 @@ function App() {
   }, [form]);
 
   useEffect(() => {
+    loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem(MY_LIST_STORAGE_KEY, JSON.stringify(myList));
   }, [myList]);
 
@@ -846,6 +860,94 @@ function App() {
     formRef.current = nextForm;
     runSearch(nextForm);
   }, []);
+
+  function updateAuthForm(event) {
+    const { name, value } = event.target;
+    setAuthForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
+  async function loadCurrentUser() {
+    try {
+      const response = await fetch(`${AUTH_API_URL}/me`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        setAuthUser(null);
+        return;
+      }
+
+      setAuthUser(await response.json());
+    } catch (error) {
+      setAuthUser(null);
+    }
+  }
+
+  async function submitAuth(event) {
+    event.preventDefault();
+    setIsAuthLoading(true);
+    setAuthStatus("");
+
+    const endpoint = authMode === "register" ? "register" : "login";
+    const payload = {
+      email: authForm.email,
+      password: authForm.password,
+    };
+
+    if (authMode === "register" && authForm.display_name.trim()) {
+      payload.display_name = authForm.display_name.trim();
+    }
+
+    try {
+      const response = await fetch(`${AUTH_API_URL}/${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        setAuthStatus(
+          authMode === "register"
+            ? "No se pudo crear la cuenta. Revisa el email o usa otra contraseña."
+            : "No se pudo iniciar sesión. Revisa email y contraseña.",
+        );
+        return;
+      }
+
+      const user = await response.json();
+      setAuthUser(user);
+      setAuthForm({ email: "", password: "", display_name: "" });
+      showToast(authMode === "register" ? "Cuenta creada" : "Sesión iniciada");
+    } catch (error) {
+      setAuthStatus("No se pudo conectar con el backend de autenticación.");
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }
+
+  async function logout() {
+    setIsAuthLoading(true);
+    setAuthStatus("");
+
+    try {
+      await fetch(`${AUTH_API_URL}/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      setAuthUser(null);
+      showToast("Sesión cerrada");
+    } catch (error) {
+      setAuthStatus("No se pudo cerrar la sesión.");
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }
 
   function updateForm(event) {
     const { name, value } = event.target;
@@ -1282,6 +1384,76 @@ function App() {
           Mi lista ({myList.length})
         </button>
       </nav>
+
+      <section className="auth-card" aria-label="Cuenta de usuario">
+        {authUser ? (
+          <div className="auth-user">
+            <div>
+              <span className="auth-label">Sesión iniciada</span>
+              <strong>{authUser.display_name || authUser.email}</strong>
+              {authUser.display_name && <span>{authUser.email}</span>}
+            </div>
+            <button className="download-button" type="button" disabled={isAuthLoading} onClick={logout}>
+              Cerrar sesión
+            </button>
+          </div>
+        ) : (
+          <div className="auth-guest">
+            <div>
+              <span className="auth-label">Modo invitado</span>
+              <strong>La app sigue disponible sin iniciar sesión</strong>
+            </div>
+            <form className="auth-form" onSubmit={submitAuth}>
+              <label>
+                Email
+                <input
+                  name="email"
+                  type="email"
+                  value={authForm.email}
+                  onChange={updateAuthForm}
+                  required
+                />
+              </label>
+              <label>
+                Contraseña
+                <input
+                  name="password"
+                  type="password"
+                  minLength="8"
+                  value={authForm.password}
+                  onChange={updateAuthForm}
+                  required
+                />
+              </label>
+              {authMode === "register" && (
+                <label>
+                  Nombre visible
+                  <input
+                    name="display_name"
+                    type="text"
+                    value={authForm.display_name}
+                    onChange={updateAuthForm}
+                  />
+                </label>
+              )}
+              <button className="download-button primary-action" type="submit" disabled={isAuthLoading}>
+                {authMode === "register" ? "Registrarse" : "Iniciar sesión"}
+              </button>
+              <button
+                className="download-button"
+                type="button"
+                onClick={() => {
+                  setAuthMode((current) => (current === "register" ? "login" : "register"));
+                  setAuthStatus("");
+                }}
+              >
+                {authMode === "register" ? "Ya tengo cuenta" : "Crear cuenta"}
+              </button>
+            </form>
+          </div>
+        )}
+        {authStatus && <p className="auth-status">{authStatus}</p>}
+      </section>
 
       <section className="toolbar" aria-label="Búsqueda de centros">
         <div>

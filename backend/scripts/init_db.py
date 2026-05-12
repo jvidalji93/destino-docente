@@ -58,6 +58,34 @@ CREATE INDEX IF NOT EXISTS idx_schools_municipality
 
 CREATE INDEX IF NOT EXISTS idx_schools_province
     ON schools (province);
+
+CREATE TABLE IF NOT EXISTS users (
+    id BIGSERIAL PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    display_name TEXT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    session_token_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    last_seen_at TIMESTAMPTZ NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_sessions_token_hash
+    ON user_sessions (session_token_hash);
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id
+    ON user_sessions (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at
+    ON user_sessions (expires_at);
 """
 
 
